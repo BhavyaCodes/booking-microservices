@@ -1,0 +1,18 @@
+import { useGoogleLogin } from "@react-oauth/google";
+
+export const UseGoogleLogin = () => {
+  const login = useGoogleLogin({
+    onSuccess: (tokenResponse) => console.log(tokenResponse),
+    flow: "auth-code",
+    redirect_uri: "https://booking.dev/api/auth/google-callback",
+    ux_mode: "redirect",
+  });
+
+  console.log(login);
+  return (
+    <div>
+      UseGoogleLogin
+      <button onClick={() => login()}>Sign in with Google 🚀 </button>
+    </div>
+  );
+};
