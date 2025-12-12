@@ -17,6 +17,8 @@ spec:
           image: booking-dev-auth:latest
           imagePullPolicy: Never
           env:
+            - name: MONGO_URI
+              value: "mongodb://auth-mongo-srv:27017/auth"
             - name: GOOGLE_CLIENT_ID
               valueFrom:
                 secretKeyRef:
@@ -32,6 +34,11 @@ spec:
                 secretKeyRef:
                   name: booking-secrets
                   key: GOOGLE_REDIRECT_URI
+            - name: JWT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: booking-secrets
+                  key: JWT_KEY
 
 ---
 apiVersion: v1
