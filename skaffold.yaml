@@ -1,0 +1,20 @@
+apiVersion: skaffold/v4beta13
+kind: Config
+build:
+  artifacts:
+    - image: booking-dev-auth
+      context: auth
+      sync:
+        manual:
+          - src: src/**/*.ts
+            dest: .
+      docker:
+        dockerfile: Dockerfile.dev
+
+  local:
+    push: false
+manifests:
+  rawYaml:
+    - ./infra/k8s/*
+deploy:
+  kubectl: {}
