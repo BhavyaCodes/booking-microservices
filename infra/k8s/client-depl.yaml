@@ -16,7 +16,17 @@ spec:
         - name: client
           image: booking-dev-client
           imagePullPolicy: IfNotPresent # Added this line for better control
-
+          env:
+            - name: NEXT_PUBLIC_GOOGLE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: booking-secrets
+                  key: NEXT_PUBLIC_GOOGLE_CLIENT_ID
+            - name: NEXT_PUBLIC_GOOGLE_REDIRECT_URI
+              valueFrom:
+                secretKeyRef:
+                  name: booking-secrets
+                  key: NEXT_PUBLIC_GOOGLE_REDIRECT_URI
 ---
 apiVersion: v1
 kind: Service

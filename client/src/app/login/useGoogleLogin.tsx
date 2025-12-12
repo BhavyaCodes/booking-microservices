@@ -4,7 +4,7 @@ export const UseGoogleLogin = () => {
   const login = useGoogleLogin({
     onSuccess: (tokenResponse) => console.log(tokenResponse),
     flow: "auth-code",
-    redirect_uri: "https://booking.dev/api/auth/google-callback",
+    redirect_uri: process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI,
     ux_mode: "redirect",
   });
 

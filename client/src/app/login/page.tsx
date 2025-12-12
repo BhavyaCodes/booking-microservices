@@ -6,7 +6,7 @@ import { UseGoogleLogin } from "./useGoogleLogin";
 const Page = () => {
   return (
     <div>
-      <GoogleOAuthProvider clientId="1007168800385-95bastm7ibbjj8dgk48to0qt1bee90pa.apps.googleusercontent.com">
+      <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!}>
         <UseGoogleLogin />
       </GoogleOAuthProvider>
     </div>
