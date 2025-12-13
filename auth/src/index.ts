@@ -10,6 +10,18 @@ const main = async () => {
     throw new Error("JWT_KEY must be present");
   }
 
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    throw new Error("GOOGLE_CLIENT_ID must be present");
+  }
+
+  if (!process.env.GOOGLE_CLIENT_SECRET) {
+    throw new Error("GOOGLE_CLIENT_SECRET must be present");
+  }
+
+  if (!process.env.GOOGLE_REDIRECT_URI) {
+    throw new Error("GOOGLE_REDIRECT_URI must be present");
+  }
+
   try {
     await mongoose.connect(process.env.MONGO_URI);
     console.log("🚀 ~ connected to MongoDB");
