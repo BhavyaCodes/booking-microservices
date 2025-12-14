@@ -3,7 +3,7 @@ import { logger } from "hono/logger";
 import axios, { AxiosError } from "axios";
 import { decode, sign } from "hono/jwt";
 import { User } from "./models/user";
-import { setCookie } from "hono/cookie";
+import { deleteCookie, setCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
 import { extractCurrentUser } from "./middlewares/currentUser";
 import { requireAuth } from "./middlewares/requireAuth";
@@ -112,7 +112,8 @@ app.get("/api/auth/current-user", async (c) => {
 });
 
 app.get("/api/auth/signout", requireAuth, (c) => {
-  return c.json({ message: "Signout route - to be implemented" });
+  deleteCookie(c, "session");
+  return c.json({ message: "Signed out" });
 });
 
 app.onError((error, c) => {
