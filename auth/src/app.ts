@@ -6,6 +6,7 @@ import { User } from "./models/user";
 import { setCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
 import { extractCurrentUser } from "./middlewares/currentUser";
+import { requireAuth } from "./middlewares/requireAuth";
 
 interface GoogleIdTokenPayload {
   iss: string;
@@ -110,9 +111,13 @@ app.get("/api/auth/current-user", async (c) => {
   return c.json({ currentUser: user });
 });
 
+app.get("/api/auth/signout", requireAuth, (c) => {
+  return c.json({ message: "Signout route - to be implemented" });
+});
+
 app.onError((error, c) => {
   if (error instanceof HTTPException) {
-    console.error(error.cause);
+    console.error("error.cause", error.cause);
     return error.getResponse();
   } else {
     console.error("Unhandled error:", error);
