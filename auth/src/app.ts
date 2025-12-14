@@ -1,10 +1,11 @@
 import { Hono } from "hono";
 import { logger } from "hono/logger";
 import axios, { AxiosError } from "axios";
-import { decode, sign, verify } from "hono/jwt";
+import { decode, sign } from "hono/jwt";
 import { User } from "./models/user";
-import { getCookie, setCookie } from "hono/cookie";
+import { setCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
+import { extractCurrentUser } from "./middlewares/currentUser";
 
 interface GoogleIdTokenPayload {
   iss: string;
@@ -30,20 +31,7 @@ const app = new Hono<{
 
 app.use(logger());
 
-app.use(async (c, next) => {
-  const sessionCookie = getCookie(c, "session");
-  if (!sessionCookie) {
-    return next();
-  }
-
-  try {
-    const payload = await verify(sessionCookie, process.env.JWT_KEY!);
-    c.set("currentUserId", payload.id as string);
-  } catch (err) {
-    throw new HTTPException(401, { message: "Invalid session" });
-  }
-  await next();
-});
+app.use(extractCurrentUser);
 
 app.get("/api/auth", (c) => {
   return c.text("Hello Hono!");
