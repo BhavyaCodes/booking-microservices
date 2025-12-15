@@ -1,0 +1,10 @@
+{
+  "name": "booking",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "workspaces": ["apps/*"],
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}
