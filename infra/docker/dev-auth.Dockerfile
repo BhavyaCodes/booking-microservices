@@ -8,7 +8,6 @@ COPY apps/auth/package.json ./apps/auth/
 RUN bun install
 
 COPY . .
-# COPY . .
 
 WORKDIR /app/apps/auth
 
