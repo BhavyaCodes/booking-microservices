@@ -1,5 +1,8 @@
 import mongoose from "mongoose";
 import { app } from "./app";
+import { greet } from "@booking/common";
+
+console.log(greet("Bhavya"));
 
 const main = async () => {
   if (!process.env.MONGO_URI) {

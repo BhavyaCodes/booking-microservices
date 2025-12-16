@@ -3,21 +3,21 @@ kind: Config
 build:
   artifacts:
     - image: booking-dev-auth
-      context: auth
+      context: .
       sync:
         manual:
-          - src: src/**/*.ts
-            dest: .
+          - src: apps/auth/src/**/*.ts
+            dest: /app
       docker:
-        dockerfile: Dockerfile.dev
+        dockerfile: infra/docker/dev-auth.Dockerfile
     - image: booking-dev-client
-      context: client
+      context: .
       docker:
-        dockerfile: Dockerfile.dev
+        dockerfile: infra/docker/dev-client.Dockerfile
       sync:
         manual:
-          - dest: .
-            src: "src/**/*.{js,ts,tsx}"
+          - src: "apps/client/src/**/*.{js,ts,tsx}"
+            dest: /app
 
   local:
     push: false
