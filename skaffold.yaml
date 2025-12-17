@@ -16,7 +16,7 @@ build:
         dockerfile: infra/docker/dev-client.Dockerfile
       sync:
         manual:
-          - src: "apps/client/src/**/*.{js,ts,tsx}"
+          - src: "apps/{client,auth}/src/**/*.{js,ts,tsx}"
             dest: /app
 
   local:
