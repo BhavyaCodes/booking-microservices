@@ -67,6 +67,7 @@ const app = new Hono<{
       const cookieJwt = await sign(
         {
           id: existingUser.id,
+          role: existingUser.role,
           exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7, // Token expires in 7 days
         },
         process.env.JWT_KEY!,
@@ -90,6 +91,7 @@ const app = new Hono<{
     const cookieJwt = await sign(
       {
         id: user.id,
+        role: user.role,
         exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7, // Token expires in 7 days
       },
       process.env.JWT_KEY!,
