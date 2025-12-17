@@ -88,7 +88,13 @@ const app = new Hono<{
 
     await user.save();
 
-    const cookieJwt = await sign({ id: user.id }, process.env.JWT_KEY!);
+    const cookieJwt = await sign(
+      {
+        id: user.id,
+        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7, // Token expires in 7 days
+      },
+      process.env.JWT_KEY!,
+    );
 
     setCookie(c, "session", cookieJwt, {
       httpOnly: true,
