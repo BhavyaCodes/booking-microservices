@@ -18,7 +18,7 @@ beforeAll(async () => {
       dbName: "test",
     },
     binary: {
-      version: "7.0.14",
+      version: "8.2.2",
     },
   });
   const mongoUri = mongo.getUri();
