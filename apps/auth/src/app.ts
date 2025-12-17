@@ -111,7 +111,7 @@ const app = new Hono<{
     const user = await User.findById(currentUserId);
     return c.json({ currentUser: user });
   })
-  .get("/api/auth/signout", requireAuth, (c) => {
+  .post("/api/auth/signout", requireAuth, (c) => {
     deleteCookie(c, "session");
     return c.json({ message: "Signed out" });
   })
