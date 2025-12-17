@@ -140,7 +140,7 @@ describe("create-admin endpoint", () => {
     const email1 = "test1@test.com";
     const email2 = "test2@test.com";
     const user1 = await global.signin(email1);
-    const user2 = await global.signin(email2);
+    await global.signin(email2);
 
     const response = await client.api.auth["create-admin"].$post(
       {
