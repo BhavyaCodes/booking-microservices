@@ -5,7 +5,7 @@ import { User } from "./models/user";
 import { sign } from "hono/jwt";
 
 declare global {
-  var signin: () => Promise<string>;
+  var signin: (email?: string) => Promise<string>;
 }
 
 let mongo: MongoMemoryServer;
@@ -32,8 +32,8 @@ afterAll(async () => {
   await mongoose.connection.close();
 });
 
-global.signin = async () => {
-  const email = "test@test.com";
+global.signin = async (email) => {
+  email = email || "test@test.com";
   const user = User.build({ email, picture: "test-picture" });
   await user.save();
 
@@ -45,5 +45,5 @@ global.signin = async () => {
     process.env.JWT_KEY!,
   );
 
-  return cookieJwt;
+  return `session=${cookieJwt}`;
 };
