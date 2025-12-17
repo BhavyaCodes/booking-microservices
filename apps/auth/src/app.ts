@@ -119,6 +119,7 @@ const app = new Hono<{
     deleteCookie(c, "session");
     return c.json({ message: "Signed out" });
   })
+  // TODO: add rate limiting to this route
   .post(
     "/api/auth/create-admin",
     requireAuth,
