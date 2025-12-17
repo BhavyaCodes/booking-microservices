@@ -125,7 +125,9 @@ const app = new Hono<{
     zValidator(
       "json",
       z.object({
-        password: z.string("Create admin password is required"),
+        password: z
+          .string({ error: "Create admin password is required" })
+          .min(1),
         email: z.email("Valid email is required"),
       }),
     ),
