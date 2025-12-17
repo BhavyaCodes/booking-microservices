@@ -39,6 +39,11 @@ spec:
                 secretKeyRef:
                   name: booking-secrets
                   key: JWT_KEY
+            - name: AUTH_CREATE_ADMIN_HASH
+              valueFrom:
+                secretKeyRef:
+                  name: booking-secrets
+                  key: AUTH_CREATE_ADMIN_HASH
 
 ---
 apiVersion: v1
