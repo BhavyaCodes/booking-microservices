@@ -28,49 +28,68 @@ const app = new Hono<{
   Variables: {
     currentUserId?: string;
   };
-}>();
+}>()
+  .use(logger())
+  .use(extractCurrentUser)
+  .get("/api/auth", (c) => {
+    return c.text("Hello Hono!");
+  })
+  .get("/api/auth/google-callback", async (c) => {
+    const code = c.req.query("code");
 
-app.use(logger());
+    const response = await axios
+      .post<{ id_token: string }>("https://oauth2.googleapis.com/token", {
+        code,
+        client_id: process.env.GOOGLE_CLIENT_ID,
+        grant_type: "authorization_code",
+        client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+      })
+      .catch((error) => {
+        if (error instanceof AxiosError) {
+          console.error("Axios error response data:", error.response?.data);
+        } else {
+          console.error("Unexpected error:", error);
+        }
+        throw new HTTPException(500, { message: "Google OAuth failed" });
+      });
 
-app.use(extractCurrentUser);
+    const jwtPayload = decode(response.data.id_token)
+      .payload as unknown as GoogleIdTokenPayload;
 
-app.get("/api/auth", (c) => {
-  return c.text("Hello Hono!");
-});
+    // check if user exists in db
 
-app.get("/api/auth/google-callback", async (c) => {
-  const code = c.req.query("code");
-
-  const response = await axios
-    .post<{ id_token: string }>("https://oauth2.googleapis.com/token", {
-      code,
-      client_id: process.env.GOOGLE_CLIENT_ID,
-      grant_type: "authorization_code",
-      client_secret: process.env.GOOGLE_CLIENT_SECRET,
-      redirect_uri: process.env.GOOGLE_REDIRECT_URI,
-    })
-    .catch((error) => {
-      if (error instanceof AxiosError) {
-        console.error("Axios error response data:", error.response?.data);
-      } else {
-        console.error("Unexpected error:", error);
-      }
-      throw new HTTPException(500, { message: "Google OAuth failed" });
+    const existingUser = await User.findOne({
+      email: jwtPayload.email,
     });
 
-  const jwtPayload = decode(response.data.id_token)
-    .payload as unknown as GoogleIdTokenPayload;
+    if (existingUser) {
+      const cookieJwt = await sign(
+        {
+          id: existingUser.id,
+          exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7, // Token expires in 7 days
+        },
+        process.env.JWT_KEY!,
+      );
 
-  // check if user exists in db
+      setCookie(c, "session", cookieJwt, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "lax",
+      });
+      return c.redirect("/");
+    }
 
-  const existingUser = await User.findOne({
-    email: jwtPayload.email,
-  });
+    const user = User.build({
+      email: jwtPayload.email,
+      picture: jwtPayload.picture,
+    });
 
-  if (existingUser) {
+    await user.save();
+
     const cookieJwt = await sign(
       {
-        id: existingUser.id,
+        id: user.id,
         exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7, // Token expires in 7 days
       },
       process.env.JWT_KEY!,
@@ -82,51 +101,31 @@ app.get("/api/auth/google-callback", async (c) => {
       sameSite: "lax",
     });
     return c.redirect("/");
-  }
+  })
+  .get("/api/auth/current-user", async (c) => {
+    const currentUserId = c.get("currentUserId");
+    if (!currentUserId) {
+      return c.json({ currentUser: null });
+    }
 
-  const user = User.build({
-    email: jwtPayload.email,
-    picture: jwtPayload.picture,
+    const user = await User.findById(currentUserId);
+    return c.json({ currentUser: user });
+  })
+  .get("/api/auth/signout", requireAuth, (c) => {
+    deleteCookie(c, "session");
+    return c.json({ message: "Signed out" });
+  })
+  .onError((error, c) => {
+    if (error instanceof HTTPException) {
+      console.error("error.cause", error.cause);
+      return error.getResponse();
+    } else {
+      console.error("Unhandled error:", error);
+      throw new HTTPException(500, {
+        cause: error,
+        message: "Internal Server Error",
+      });
+    }
   });
-
-  await user.save();
-
-  const cookieJwt = await sign({ id: user.id }, process.env.JWT_KEY!);
-
-  setCookie(c, "session", cookieJwt, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-  });
-  return c.redirect("/");
-});
-
-app.get("/api/auth/current-user", async (c) => {
-  const currentUserId = c.get("currentUserId");
-  if (!currentUserId) {
-    return c.json({ currentUser: null });
-  }
-
-  const user = await User.findById(currentUserId);
-  return c.json({ currentUser: user });
-});
-
-app.get("/api/auth/signout", requireAuth, (c) => {
-  deleteCookie(c, "session");
-  return c.json({ message: "Signed out" });
-});
-
-app.onError((error, c) => {
-  if (error instanceof HTTPException) {
-    console.error("error.cause", error.cause);
-    return error.getResponse();
-  } else {
-    console.error("Unhandled error:", error);
-    throw new HTTPException(500, {
-      cause: error,
-      message: "Internal Server Error",
-    });
-  }
-});
 
 export { app };

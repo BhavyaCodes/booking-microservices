@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@booking/auth/app": ["../auth/src/app.ts"]
     }
   },
   "include": [
