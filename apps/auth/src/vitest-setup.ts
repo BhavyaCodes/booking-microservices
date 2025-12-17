@@ -1,8 +1,9 @@
-import { beforeAll, afterAll } from "vitest";
+import { beforeAll, afterAll, afterEach } from "vitest";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import mongoose from "mongoose";
 import { User } from "./models/user";
 import { sign } from "hono/jwt";
+import { randomUUID } from "crypto";
 
 declare global {
   var signin: (email?: string) => Promise<string>;
@@ -22,7 +23,6 @@ beforeAll(async () => {
   });
   const mongoUri = mongo.getUri();
   await mongoose.connect(mongoUri);
-  console.log("Connected to in-memory MongoDB");
 });
 
 afterAll(async () => {
@@ -32,8 +32,12 @@ afterAll(async () => {
   await mongoose.connection.close();
 });
 
+afterEach(async () => {
+  await mongoose.connection.dropDatabase();
+});
+
 global.signin = async (email) => {
-  email = email || "test@test.com";
+  email = email || randomUUID() + "@test.com";
   const user = User.build({ email, picture: "test-picture" });
   await user.save();
 

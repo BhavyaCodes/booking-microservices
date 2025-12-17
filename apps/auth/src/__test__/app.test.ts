@@ -4,12 +4,6 @@ import { describe, it, expect } from "vitest";
 
 const client = testClient(authApp);
 
-describe("sample test", () => {
-  it("should run test", () => {
-    expect(1 + 1).toBe(2);
-  });
-});
-
 describe("test if route protection is working", () => {
   it("should not be able to signout when not signed in", async () => {
     const response = await client.api.auth.signout.$post();
