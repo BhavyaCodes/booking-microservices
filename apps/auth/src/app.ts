@@ -111,11 +111,7 @@ const app = new Hono<{
     return c.redirect("/");
   })
   .get("/api/auth/current-user", requireAuth, async (c) => {
-    const currentUserId = c.get("currentUser")?.id;
-    if (!currentUserId) {
-      return c.json({ currentUser: null });
-    }
-
+    const currentUserId = c.get("currentUser").id;
     const user = await User.findById(currentUserId);
     return c.json({ currentUser: user });
   })
