@@ -7,7 +7,6 @@ import { deleteCookie, setCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
 import { extractCurrentUser } from "./middlewares/currentUser";
 import { requireAuth } from "./middlewares/requireAuth";
-import { hc } from "hono/client";
 
 interface GoogleIdTokenPayload {
   iss: string;
@@ -129,8 +128,4 @@ const app = new Hono<{
     }
   });
 
-type AppType = typeof app;
-
-const client = hc<AppType>("https://booking.dev");
-
-export { app, client as authClient };
+export { app };

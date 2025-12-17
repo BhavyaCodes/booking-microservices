@@ -8,9 +8,9 @@
     "start": "bun run src/index.ts"
   },
   "exports": {
-    "./app": {
-      "types": "./src/app.ts",
-      "default": "./src/app.ts"
+    "./client": {
+      "types": "./src/client.ts",
+      "default": "./src/client.ts"
     }
   },
   "dependencies": {

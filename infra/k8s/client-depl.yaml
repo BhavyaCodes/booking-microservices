@@ -27,6 +27,8 @@ spec:
                 secretKeyRef:
                   name: booking-secrets
                   key: NEXT_PUBLIC_GOOGLE_REDIRECT_URI
+            - name: NEXT_PUBLIC_BASE_URL
+              value: "https://booking.dev"
 ---
 apiVersion: v1
 kind: Service
