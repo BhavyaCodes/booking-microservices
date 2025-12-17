@@ -2,11 +2,14 @@ import { Hono } from "hono";
 import { logger } from "hono/logger";
 import axios, { AxiosError } from "axios";
 import { decode, sign } from "hono/jwt";
-import { User } from "./models/user";
+import { User, UserRoles } from "./models/user";
 import { deleteCookie, setCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
 import { extractCurrentUser } from "./middlewares/currentUser";
 import { requireAuth } from "./middlewares/requireAuth";
+import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
+import { compare } from "bcryptjs";
 
 interface GoogleIdTokenPayload {
   iss: string;
@@ -26,7 +29,10 @@ interface GoogleIdTokenPayload {
 
 const app = new Hono<{
   Variables: {
-    currentUserId?: string;
+    currentUser: {
+      id: string;
+      role: UserRoles;
+    };
   };
 }>()
   .use(logger())
@@ -104,8 +110,8 @@ const app = new Hono<{
     });
     return c.redirect("/");
   })
-  .get("/api/auth/current-user", async (c) => {
-    const currentUserId = c.get("currentUserId");
+  .get("/api/auth/current-user", requireAuth, async (c) => {
+    const currentUserId = c.get("currentUser")?.id;
     if (!currentUserId) {
       return c.json({ currentUser: null });
     }
@@ -117,6 +123,41 @@ const app = new Hono<{
     deleteCookie(c, "session");
     return c.json({ message: "Signed out" });
   })
+  .post(
+    "/api/auth/create-admin",
+    requireAuth,
+    zValidator(
+      "json",
+      z.object({
+        password: z.string("Create admin password is required"),
+        email: z.email("Valid email is required"),
+      }),
+    ),
+    async (c) => {
+      const email = c.req.valid("json").email;
+      const password = c.req.valid("json").password;
+
+      const isMatch = await compare(
+        password,
+        process.env.AUTH_CREATE_ADMIN_HASH,
+      );
+
+      if (!isMatch) {
+        throw new HTTPException(403, { message: "Incorrect password" });
+      }
+
+      const user = await User.findOne({ email });
+
+      if (!user) {
+        throw new HTTPException(404, { message: "User not found" });
+      }
+
+      user.role = UserRoles.ADMIN;
+      await user.save();
+
+      return c.json({ message: "User promoted to admin successfully" }, 201);
+    },
+  )
   .onError((error, c) => {
     if (error instanceof HTTPException) {
       console.error("error.cause", error.cause);

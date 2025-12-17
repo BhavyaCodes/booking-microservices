@@ -22,6 +22,10 @@ const main = async () => {
     throw new Error("GOOGLE_REDIRECT_URI must be present");
   }
 
+  if (!process.env.AUTH_CREATE_ADMIN_HASH) {
+    throw new Error("AUTH_CREATE_ADMIN_HASH must be present");
+  }
+
   try {
     await mongoose.connect(process.env.MONGO_URI);
     console.log("🚀 ~ connected to MongoDB");

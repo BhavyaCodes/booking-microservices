@@ -7,11 +7,14 @@ import { randomUUID } from "crypto";
 
 declare global {
   var signin: (email?: string) => Promise<string>;
+  var createAdminPassword: string;
 }
 
 let mongo: MongoMemoryServer;
 
 beforeAll(async () => {
+  process.env.AUTH_CREATE_ADMIN_HASH =
+    "$2b$06$ZaHWT8jtdqmBXBI2/49P7ekYPuMmhOOo62PtE2/uB.bhLyR3.aXNS";
   process.env.JWT_KEY = "asoifhgosidf";
   mongo = await MongoMemoryServer.create({
     instance: {
@@ -51,3 +54,5 @@ global.signin = async (email) => {
 
   return `session=${cookieJwt}`;
 };
+
+global.createAdminPassword = "sodifhiuhg989283444";
