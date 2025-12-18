@@ -17,7 +17,17 @@ export const extractCurrentUser = async (c: Context, next: Next) => {
       role: payload.role as UserRoles,
     });
   } catch (err) {
-    throw new HTTPException(401, { message: "Invalid session" });
+    throw new HTTPException(401, {
+      res: new Response(
+        JSON.stringify({
+          message: "Invalid session",
+        }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    });
   }
   await next();
 };

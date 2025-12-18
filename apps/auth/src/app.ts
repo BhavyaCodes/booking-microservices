@@ -56,7 +56,16 @@ const app = new Hono<{
         } else {
           console.error("Unexpected error:", error);
         }
-        throw new HTTPException(500, { message: "Google OAuth failed" });
+        throw new HTTPException(500, {
+          res: new Response(
+            JSON.stringify({
+              message: "Google OAuth failed",
+            }),
+            {
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+        });
       });
 
     const jwtPayload = decode(response.data.id_token)
@@ -141,13 +150,31 @@ const app = new Hono<{
       );
 
       if (!isMatch) {
-        throw new HTTPException(403, { message: "Incorrect password" });
+        throw new HTTPException(401, {
+          res: new Response(
+            JSON.stringify({
+              message: "Incorrect password",
+            }),
+            {
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+        });
       }
 
       const user = await User.findOne({ email });
 
       if (!user) {
-        throw new HTTPException(404, { message: "User not found" });
+        throw new HTTPException(404, {
+          res: new Response(
+            JSON.stringify({
+              message: "User not found",
+            }),
+            {
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+        });
       }
 
       user.role = UserRoles.ADMIN;
@@ -158,13 +185,18 @@ const app = new Hono<{
   )
   .onError((error, c) => {
     if (error instanceof HTTPException) {
-      console.error("error.cause", error.cause);
       return error.getResponse();
     } else {
       console.error("Unhandled error:", error);
       throw new HTTPException(500, {
-        cause: error,
-        message: "Internal Server Error",
+        res: new Response(
+          JSON.stringify({
+            message: "Internal Server Error",
+          }),
+          {
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
       });
     }
   });
