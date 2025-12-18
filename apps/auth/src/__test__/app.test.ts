@@ -61,6 +61,26 @@ describe("create-admin endpoint", () => {
     expect(response.status).toBe(401);
   });
 
+  it("should return 400 when email and password are not provided", async () => {
+    const user1 = await global.signin("test1@test.com");
+    const response = await client.api.auth["create-admin"].$post(
+      {
+        //@ts-expect-error testing invalid input
+        json: {
+          // password: "somepassword",
+          // email: "someemail@example.com",
+        },
+      },
+      {
+        headers: {
+          Cookie: user1,
+        },
+      },
+    );
+
+    expect(response.status).toBe(400);
+  });
+
   it("should return 400 when email is not provided", async () => {
     const user1 = await global.signin("test1@test.com");
     const response = await client.api.auth["create-admin"].$post(
