@@ -1,8 +1,8 @@
-import { Context, Next } from "hono";
+import type { Context, Next } from "hono";
 import { getCookie } from "hono/cookie";
 import { verify } from "hono/jwt";
 import { HTTPException } from "hono/http-exception";
-import { UserRoles } from "../models/user";
+import type { UserRoles } from "../interfaces";
 
 export const extractCurrentUser = async (c: Context, next: Next) => {
   const sessionCookie = getCookie(c, "session");

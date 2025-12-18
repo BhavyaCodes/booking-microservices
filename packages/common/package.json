@@ -5,10 +5,24 @@
   "main": "index.ts",
   "type": "module",
   "private": true,
+  "exports": {
+    ".": {
+      "import": "./index.ts"
+    },
+    "./middlewares": {
+      "import": "./middlewares/index.ts"
+    },
+    "./interfaces": {
+      "import": "./interfaces/index.ts"
+    }
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "dependencies": {
+    "hono": "^4.11.1"
   }
 }

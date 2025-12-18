@@ -1,9 +1,5 @@
 import mongoose from "mongoose";
-
-enum UserRoles {
-  ADMIN = "admin",
-  USER = "user",
-}
+import { UserRoles } from "@booking/common/interfaces";
 
 interface UserAttrs {
   email: string;
