@@ -49,6 +49,9 @@
     "packages/common": {
       "name": "@booking/common",
       "version": "0.0.1",
+      "dependencies": {
+        "hono": "^4.11.1",
+      },
       "devDependencies": {
         "@types/bun": "latest",
       },
