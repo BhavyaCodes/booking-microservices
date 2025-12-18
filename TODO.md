@@ -1,0 +1,1 @@
+- [ ] error helper to make HTTP error payload same across the app
