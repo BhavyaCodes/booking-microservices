@@ -12,7 +12,9 @@
     "./middlewares": {
       "import": "./middlewares/index.ts"
     },
-    "./interfaces": "./interfaces/index.ts"
+    "./interfaces": {
+      "import": "./interfaces/index.ts"
+    }
   },
   "devDependencies": {
     "@types/bun": "latest"
