@@ -8,7 +8,8 @@ import {
 
 export const eventsTable = pgTable("events", {
   id: uuid().primaryKey().defaultRandom(),
-  name: varchar({ length: 255 }).notNull().unique(),
+  title: varchar({ length: 255 }).notNull(),
+  desc: varchar({ length: 1000 }).notNull(),
   date: timestamp().notNull(),
   draft: boolean().notNull().default(true),
   imageUrl: varchar({ length: 500 }),
