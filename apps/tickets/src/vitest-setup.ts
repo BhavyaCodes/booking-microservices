@@ -1,8 +1,10 @@
-import { beforeAll, afterAll, afterEach } from "vitest";
+import { beforeAll, afterAll, afterEach, beforeEach } from "vitest";
 
 import { sign } from "hono/jwt";
 import { randomUUID } from "crypto";
 import { UserRoles } from "@booking/common/interfaces";
+import { db } from "./db";
+import { eventsTable } from "./db/schema";
 
 declare global {
   var signin: (options?: { id?: string; role?: UserRoles }) => Promise<string>;
@@ -10,6 +12,10 @@ declare global {
 
 beforeAll(async () => {
   process.env.JWT_KEY = "asoifhgosidf";
+});
+
+beforeEach(async () => {
+  await db.delete(eventsTable);
 });
 
 afterAll(async () => {});

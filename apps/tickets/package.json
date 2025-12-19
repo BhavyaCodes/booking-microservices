@@ -8,6 +8,7 @@
     "dev:server": "bun run --hot src/index.ts",
     "migrate:dev": "drizzle-kit push --config=./src/db/drizzle.config.ts",
     "dev": "bun run migrate:dev && bun run dev:server",
+    "migrate:test": "drizzle-kit push --config=./src/db/drizzle-test.config.ts",
     "test": "vitest"
   },
   "dependencies": {
