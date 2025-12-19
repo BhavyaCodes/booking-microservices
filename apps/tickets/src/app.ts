@@ -3,6 +3,10 @@ import { logger } from "hono/logger";
 import { extractCurrentUser, requireAdmin } from "@booking/common/middlewares";
 import { HTTPException } from "hono/http-exception";
 import { CurrentUser } from "@booking/common/interfaces";
+import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
+import { db } from "./db";
+import { eventsTable } from "./db/schema";
 
 const app = new Hono<{
   Variables: {
@@ -12,12 +16,36 @@ const app = new Hono<{
   .use(logger())
   .use(extractCurrentUser)
   .get("/api/tickets", (c) => {
-    console.log("Hello ticket service !!");
-    return c.json({ message: "Hello ticket serviceeee !!" });
+    return c.json({ message: "Hello ticket service !!" });
   })
-  .post("/api/tickets/events", requireAdmin, async (c) => {
-    return c.json({ message: "Creating an event" });
-  })
+  .post(
+    "/api/tickets/events",
+    requireAdmin,
+    zValidator(
+      "json",
+      z.object({
+        title: z.string().min(1).max(255),
+        desc: z.string().nonempty().max(1000),
+        date: z.coerce.date().min(new Date()),
+        imageUrl: z.url().max(500).optional(),
+      }),
+    ),
+    async (c) => {
+      const { title, desc, date, imageUrl } = c.req.valid("json");
+
+      const newEvent = await db
+        .insert(eventsTable)
+        .values({
+          title,
+          desc,
+          date,
+          imageUrl,
+        })
+        .returning();
+
+      return c.json(newEvent[0], 201);
+    },
+  )
   .onError((error, c) => {
     if (error instanceof HTTPException) {
       return error.getResponse();
