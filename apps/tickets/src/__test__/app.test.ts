@@ -7,7 +7,7 @@ import { eventsTable } from "../db/schema";
 
 const client = testClient(ticketsApp);
 
-describe("check enviornment NODE_ENV", () => {
+describe("check environment NODE_ENV", () => {
   it("should be test", () => {
     expect(process.env.NODE_ENV).toBe("test");
   });
@@ -75,7 +75,7 @@ describe("test if admin only route protection is working", () => {
     });
     console.log("🚀 ~ insertedEvent:", insertedEvent);
 
-    expect(insertedEvent).not.toBeNullable();
+    expect(insertedEvent).toBeDefined();
   });
 });
 
@@ -105,7 +105,7 @@ it("should create event in the database", async () => {
     where: (eventsTable, { eq }) => eq(eventsTable.title, title),
   });
 
-  expect(insertedEvent).not.toBeNullable();
+  expect(insertedEvent).toBeDefined();
 });
 
 it("should be able to store multiple events in the database", async () => {
@@ -138,7 +138,7 @@ it("should be able to store multiple events in the database", async () => {
     const insertedEvent = await db.query.eventsTable.findFirst({
       where: (eventsTable, { eq }) => eq(eventsTable.title, title),
     });
-    expect(insertedEvent).not.toBeNullable();
+    expect(insertedEvent).toBeDefined();
   }
 });
 
@@ -166,6 +166,6 @@ it("event should have draft set to true by default", async () => {
     where: (eventsTable, { eq }) => eq(eventsTable.title, title),
   });
 
-  expect(insertedEvent).not.toBeNullable();
+  expect(insertedEvent).toBeDefined();
   expect(insertedEvent!.draft).toBe(true);
 });
