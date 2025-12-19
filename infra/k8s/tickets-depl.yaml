@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tickets-depl
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tickets
+  template:
+    metadata:
+      labels:
+        app: tickets
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:latest
+          command:
+            [
+              "sh",
+              "-c",
+              "until nc -z tickets-postgres-srv 5432; do echo waiting for postgres; sleep 2; done",
+            ]
+      containers:
+        - name: tickets
+          image: booking-dev-tickets:latest
+          imagePullPolicy: Never
+          env:
+            - name: JWT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: booking-secrets
+                  key: JWT_KEY
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: booking-secrets
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: booking-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: booking-secrets
+                  key: POSTGRES_DB
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tickets-srv
+spec:
+  selector:
+    app: tickets
+  ports:
+    - name: tickets
+      protocol: TCP
+      port: 3000
+      targetPort: 3000

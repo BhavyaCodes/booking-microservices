@@ -1,3 +1,5 @@
 **/node_modules
+apps/client
+apps/auth
 **/.git
 infra

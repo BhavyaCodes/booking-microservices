@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tickets-postgres-depl
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tickets-postgres
+  template:
+    metadata:
+      labels:
+        app: tickets-postgres
+    spec:
+      containers:
+        - name: tickets-postgres
+          image: postgres
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: booking-secrets
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: booking-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: booking-secrets
+                  key: POSTGRES_DB
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tickets-postgres-srv
+spec:
+  type: ClusterIP
+  selector:
+    app: tickets-postgres
+  ports:
+    - name: db
+      protocol: TCP
+      port: 5432
+      targetPort: 5432
