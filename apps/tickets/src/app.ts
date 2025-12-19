@@ -26,7 +26,9 @@ const app = new Hono<{
       z.object({
         title: z.string().min(1).max(255),
         desc: z.string().min(1).max(1000),
-        date: z.coerce.date().min(new Date()),
+        date: z.coerce.date().refine((date) => date >= new Date(), {
+          message: "Date must not be in the past",
+        }),
         imageUrl: z.url().max(500).optional(),
       }),
     ),
