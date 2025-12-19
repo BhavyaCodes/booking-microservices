@@ -18,10 +18,6 @@ beforeEach(async () => {
   await db.delete(eventsTable);
 });
 
-afterAll(async () => {});
-
-afterEach(async () => {});
-
 global.signin = async (options) => {
   const cookieJwt = await sign(
     {
