@@ -73,7 +73,6 @@ describe("test if admin only route protection is working", () => {
     const insertedEvent = await db.query.eventsTable.findFirst({
       where: (eventsTable, { eq }) => eq(eventsTable.title, title),
     });
-    console.log("🚀 ~ insertedEvent:", insertedEvent);
 
     expect(insertedEvent).toBeDefined();
   });
@@ -83,7 +82,7 @@ it("should create event in the database", async () => {
   const title = "test event title";
   const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-  const response = await client.api.tickets.events.$post(
+  await client.api.tickets.events.$post(
     {
       json: {
         date: new Date(),
