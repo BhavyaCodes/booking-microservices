@@ -12,6 +12,15 @@ spec:
       labels:
         app: tickets
     spec:
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:latest
+          command:
+            [
+              "sh",
+              "-c",
+              "until nc -z tickets-postgres-srv 5432; do echo waiting for postgres; sleep 2; done",
+            ]
       containers:
         - name: tickets
           image: booking-dev-tickets:latest
