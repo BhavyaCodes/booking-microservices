@@ -9,6 +9,7 @@ import { extractCurrentUser, requireAuth } from "@booking/common/middlewares";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { compare } from "bcryptjs";
+import { CurrentUser } from "@booking/common/interfaces";
 
 interface GoogleIdTokenPayload {
   iss: string;
@@ -28,10 +29,7 @@ interface GoogleIdTokenPayload {
 
 const app = new Hono<{
   Variables: {
-    currentUser: {
-      id: string;
-      role: UserRoles;
-    };
+    currentUser: CurrentUser;
   };
 }>()
   .use(logger())

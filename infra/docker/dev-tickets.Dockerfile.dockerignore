@@ -3,3 +3,4 @@ apps/client
 apps/auth
 **/.git
 infra
+**/*.test.ts
