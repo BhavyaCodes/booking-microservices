@@ -21,13 +21,13 @@ export const requireAdmin = async (c: Context, next: Next) => {
   if (currentUser.role === UserRoles.ADMIN) {
     await next();
   } else {
-    throw new HTTPException(401, {
+    throw new HTTPException(403, {
       res: new Response(
         JSON.stringify({
           message: "Not authorized",
         }),
         {
-          status: 401,
+          status: 403,
           headers: { "Content-Type": "application/json" },
         },
       ),
