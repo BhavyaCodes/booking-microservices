@@ -1,8 +1,12 @@
 {
   "name": "@booking/tickets",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
   "scripts": {
     "dev:server": "bun run --hot src/index.ts",
-    "migrate:dev": "drizzle-kit push",
+    "migrate:dev": "drizzle-kit push --config=./src/db/drizzle.config.ts",
     "dev": "bun run migrate:dev && bun run dev:server"
   },
   "dependencies": {
