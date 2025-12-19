@@ -1,5 +1,6 @@
-import { pool } from "./db";
+import { db } from "./db";
 import { app } from "./app";
+import { sql } from "drizzle-orm";
 
 const main = async () => {
   if (!process.env.JWT_KEY) {
@@ -14,18 +15,15 @@ const main = async () => {
     throw new Error("Postgres environment variables must be set");
   }
 
-  pool.connect().then(() => {
-    console.log("🚀 Connected to Postgres");
-
-    Bun.serve({
-      port: 3000,
-      fetch: app.fetch,
-    });
-  });
-
-  pool.on("error", (err) => {
-    console.error("Unexpected error on idle Postgres client", err);
+  await db.execute(sql`SELECT 1`).catch(() => {
+    console.error("Failed to connect to Postgres");
     process.exit(-1);
+  });
+  console.log("🚀 ~ connected to Postgres");
+
+  Bun.serve({
+    port: 3000,
+    fetch: app.fetch,
   });
 };
 
