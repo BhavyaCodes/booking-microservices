@@ -47,7 +47,7 @@
       },
     },
     "apps/tickets": {
-      "name": "tickets",
+      "name": "@booking/tickets",
       "dependencies": {
         "drizzle-orm": "^0.45.1",
         "hono": "^4.11.1",
