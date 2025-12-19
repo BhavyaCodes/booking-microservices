@@ -1,27 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: tickets-depl
+  name: tickets-postgres-depl
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: tickets
+      app: tickets-postgres
   template:
     metadata:
       labels:
-        app: tickets
+        app: tickets-postgres
     spec:
       containers:
-        - name: tickets
-          image: booking-dev-tickets:latest
-          imagePullPolicy: Never
+        - name: tickets-postgres
+          image: postgres
+          imagePullPolicy: IfNotPresent
           env:
-            - name: JWT_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: booking-secrets
-                  key: JWT_KEY
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -37,16 +32,18 @@ spec:
                 secretKeyRef:
                   name: booking-secrets
                   key: POSTGRES_DB
+
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: tickets-srv
+  name: tickets-postgres-srv
 spec:
+  type: ClusterIP
   selector:
-    app: tickets
+    app: tickets-postgres
   ports:
-    - name: tickets
+    - name: db
       protocol: TCP
-      port: 3000
-      targetPort: 3000
+      port: 5432
+      targetPort: 5432

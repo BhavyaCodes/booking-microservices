@@ -1,12 +1,18 @@
 {
-  "name": "tickets",
+  "name": "@booking/tickets",
   "scripts": {
-    "dev": "bun run --hot src/index.ts"
+    "dev:server": "bun run --hot src/index.ts",
+    "migrate:dev": "drizzle-kit push",
+    "dev": "bun run migrate:dev && bun run dev:server"
   },
   "dependencies": {
-    "hono": "^4.11.1"
+    "drizzle-orm": "^0.45.1",
+    "hono": "^4.11.1",
+    "pg": "^8.16.3"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/pg": "^8.16.0",
+    "drizzle-kit": "^0.31.8"
   }
 }
