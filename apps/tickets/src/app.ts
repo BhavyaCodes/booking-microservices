@@ -25,7 +25,7 @@ const app = new Hono<{
       "json",
       z.object({
         title: z.string().min(1).max(255),
-        desc: z.string().nonempty().max(1000),
+        desc: z.string().min(1).max(1000),
         date: z.coerce.date().min(new Date()),
         imageUrl: z.url().max(500).optional(),
       }),
