@@ -56,7 +56,7 @@ describe("test if admin only route protection is working", () => {
     const response = await client.api.tickets.events.$post(
       {
         json: {
-          date: new Date(),
+          date: new Date(new Date().getTime() + 3600 * 1000),
           desc: "Some event description",
           title: title,
           imageUrl: "https://example.com/image.jpg",
@@ -68,6 +68,9 @@ describe("test if admin only route protection is working", () => {
         },
       },
     );
+
+    console.log(await response.json());
+
     expect(response.status).toBe(201);
 
     const insertedEvent = await db.query.eventsTable.findFirst({
@@ -85,7 +88,8 @@ it("should create event in the database", async () => {
   await client.api.tickets.events.$post(
     {
       json: {
-        date: new Date(),
+        date: new Date(new Date().getTime() + 3600 * 1000),
+
         desc: "Some event description",
         title: title,
         imageUrl: "https://example.com/image.jpg",
@@ -116,7 +120,8 @@ it("should be able to store multiple events in the database", async () => {
     await client.api.tickets.events.$post(
       {
         json: {
-          date: new Date(),
+          date: new Date(new Date().getTime() + 3600 * 1000),
+
           desc: "Some event description",
           title: title,
           imageUrl: "https://example.com/image.jpg",
@@ -148,7 +153,8 @@ it("event should have draft set to true by default", async () => {
   await client.api.tickets.events.$post(
     {
       json: {
-        date: new Date(),
+        date: new Date(new Date().getTime() + 3600 * 1000),
+
         desc: "Some event description",
         title: title,
         imageUrl: "https://example.com/image.jpg",
