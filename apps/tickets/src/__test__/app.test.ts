@@ -176,6 +176,33 @@ it("event should have draft set to true by default", async () => {
 });
 
 describe("add seat categories to event", () => {
+  it("Should throw 400 when event id is not a valid uuid", async () => {
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+    const newSeatCategoryResponse = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 10,
+          price: 100,
+          seatsPerRow: 20,
+        },
+        param: {
+          eventId: "invalid-uuid",
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(newSeatCategoryResponse.status).toBe(400);
+  });
+
   it("should add seat category to an event", async () => {
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
@@ -343,7 +370,7 @@ describe("add seat categories to event", () => {
     expect(tickets.length).toBe(50);
   });
 
-  describe("should not be able to add multiple seat categories if rows overlap", async () => {
+  describe("should not be able to add multiple seat categories if rows overlap", () => {
     const setup = async (
       s1: number,
       e1: number,
