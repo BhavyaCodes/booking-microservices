@@ -391,9 +391,9 @@ describe("add seat categories to event", () => {
     ]["seat-categories"].$post(
       {
         json: {
-          startRow: 1,
-          endRow: 10,
-          price: 100,
+          startRow: 11,
+          endRow: 20,
+          price: 150,
           seatsPerRow: 20,
         },
         param: {
@@ -416,5 +416,413 @@ describe("add seat categories to event", () => {
     });
 
     expect(eventSeatCategories.length).toBe(2);
+  });
+
+  it("should reject overlapping row ranges - exact overlap", async () => {
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+    const newEventResponse = await client.api.tickets.events.$post(
+      {
+        json: {
+          date: new Date(new Date().getTime() + 3600 * 1000),
+          desc: "Some event description",
+          title: "Event for overlap test",
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    const newEvent = await newEventResponse.json();
+
+    // Create first seat category
+    const firstCategoryResponse = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 10,
+          price: 100,
+          seatsPerRow: 20,
+        },
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(firstCategoryResponse.status).toBe(201);
+
+    // Try to create second seat category with exact same range
+    const secondCategoryResponse = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 10,
+          price: 150,
+          seatsPerRow: 20,
+        },
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(secondCategoryResponse.status).toBe(400);
+    const errorResponse = await secondCategoryResponse.json();
+    expect(errorResponse.message).toBe(
+      "Row range overlaps with an existing seat category",
+    );
+  });
+
+  it("should reject overlapping row ranges - partial overlap from start", async () => {
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+    const newEventResponse = await client.api.tickets.events.$post(
+      {
+        json: {
+          date: new Date(new Date().getTime() + 3600 * 1000),
+          desc: "Some event description",
+          title: "Event for overlap test",
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    const newEvent = await newEventResponse.json();
+
+    // Create first seat category (rows 5-15)
+    await client.api.tickets.events[":eventId"]["seat-categories"].$post(
+      {
+        json: {
+          startRow: 5,
+          endRow: 15,
+          price: 100,
+          seatsPerRow: 20,
+        },
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    // Try to create second seat category with overlap (rows 1-10)
+    const secondCategoryResponse = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 10,
+          price: 150,
+          seatsPerRow: 20,
+        },
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(secondCategoryResponse.status).toBe(400);
+  });
+
+  it("should reject overlapping row ranges - partial overlap from end", async () => {
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+    const newEventResponse = await client.api.tickets.events.$post(
+      {
+        json: {
+          date: new Date(new Date().getTime() + 3600 * 1000),
+          desc: "Some event description",
+          title: "Event for overlap test",
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    const newEvent = await newEventResponse.json();
+
+    // Create first seat category (rows 1-10)
+    await client.api.tickets.events[":eventId"]["seat-categories"].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 10,
+          price: 100,
+          seatsPerRow: 20,
+        },
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    // Try to create second seat category with overlap (rows 5-15)
+    const secondCategoryResponse = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 5,
+          endRow: 15,
+          price: 150,
+          seatsPerRow: 20,
+        },
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(secondCategoryResponse.status).toBe(400);
+  });
+
+  it("should reject overlapping row ranges - new range contains existing", async () => {
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+    const newEventResponse = await client.api.tickets.events.$post(
+      {
+        json: {
+          date: new Date(new Date().getTime() + 3600 * 1000),
+          desc: "Some event description",
+          title: "Event for overlap test",
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    const newEvent = await newEventResponse.json();
+
+    // Create first seat category (rows 5-10)
+    await client.api.tickets.events[":eventId"]["seat-categories"].$post(
+      {
+        json: {
+          startRow: 5,
+          endRow: 10,
+          price: 100,
+          seatsPerRow: 20,
+        },
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    // Try to create second seat category that contains the first (rows 1-15)
+    const secondCategoryResponse = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 15,
+          price: 150,
+          seatsPerRow: 20,
+        },
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(secondCategoryResponse.status).toBe(400);
+  });
+
+  it("should reject overlapping row ranges - existing range contains new", async () => {
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+    const newEventResponse = await client.api.tickets.events.$post(
+      {
+        json: {
+          date: new Date(new Date().getTime() + 3600 * 1000),
+          desc: "Some event description",
+          title: "Event for overlap test",
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    const newEvent = await newEventResponse.json();
+
+    // Create first seat category (rows 1-20)
+    await client.api.tickets.events[":eventId"]["seat-categories"].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 20,
+          price: 100,
+          seatsPerRow: 20,
+        },
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    // Try to create second seat category contained within the first (rows 5-10)
+    const secondCategoryResponse = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 5,
+          endRow: 10,
+          price: 150,
+          seatsPerRow: 20,
+        },
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(secondCategoryResponse.status).toBe(400);
+  });
+
+  it("should allow adjacent row ranges - end to start", async () => {
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+    const newEventResponse = await client.api.tickets.events.$post(
+      {
+        json: {
+          date: new Date(new Date().getTime() + 3600 * 1000),
+          desc: "Some event description",
+          title: "Event for adjacent test",
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    const newEvent = await newEventResponse.json();
+
+    // Create first seat category (rows 1-10)
+    const firstCategoryResponse = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 10,
+          price: 100,
+          seatsPerRow: 20,
+        },
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(firstCategoryResponse.status).toBe(201);
+
+    // Create second seat category adjacent (rows 11-20) - should succeed
+    const secondCategoryResponse = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 11,
+          endRow: 20,
+          price: 150,
+          seatsPerRow: 20,
+        },
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(secondCategoryResponse.status).toBe(201);
   });
 });

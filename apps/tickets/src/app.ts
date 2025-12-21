@@ -7,6 +7,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db } from "./db";
 import { eventsTable, seatCategoriesTable, ticketsTable } from "./db/schema";
+import { eq, and, or, lte, gte } from "drizzle-orm";
 
 const app = new Hono<{
   Variables: {
@@ -99,6 +100,29 @@ const app = new Hono<{
       }
 
       const { startRow, endRow, price, seatsPerRow } = c.req.valid("json");
+
+      // Check for overlapping row ranges
+      const existingCategories = await db.query.seatCategoriesTable.findMany({
+        where: eq(seatCategoriesTable.eventId, eventId),
+      });
+
+      const hasOverlap = existingCategories.some((category) => {
+        // Check if ranges overlap: new range overlaps if it starts before existing ends AND ends after existing starts
+        return startRow <= category.endRow && endRow >= category.startRow;
+      });
+
+      if (hasOverlap) {
+        throw new HTTPException(400, {
+          res: new Response(
+            JSON.stringify({
+              message: "Row range overlaps with an existing seat category",
+            }),
+            {
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+        });
+      }
 
       const newSeatCategory = await db.transaction(async (tx) => {
         try {
