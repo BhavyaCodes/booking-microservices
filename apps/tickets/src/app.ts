@@ -7,7 +7,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db } from "./db";
 import { eventsTable, seatCategoriesTable, ticketsTable } from "./db/schema";
-import { eq, and, or, lte, gte } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 const app = new Hono<{
   Variables: {
@@ -104,6 +104,10 @@ const app = new Hono<{
       // Check for overlapping row ranges
       const existingCategories = await db.query.seatCategoriesTable.findMany({
         where: eq(seatCategoriesTable.eventId, eventId),
+        columns: {
+          startRow: true,
+          endRow: true,
+        },
       });
 
       const hasOverlap = existingCategories.some((category) => {
