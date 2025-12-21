@@ -4,6 +4,8 @@ import {
   varchar,
   timestamp,
   boolean,
+  integer,
+  unique,
 } from "drizzle-orm/pg-core";
 
 export const eventsTable = pgTable("events", {
@@ -14,3 +16,29 @@ export const eventsTable = pgTable("events", {
   draft: boolean().notNull().default(true),
   imageUrl: varchar({ length: 500 }),
 });
+
+export const seatCategoriesTable = pgTable("seat_categories", {
+  id: uuid().primaryKey().defaultRandom(),
+  eventId: uuid()
+    .notNull()
+    .references(() => eventsTable.id, { onDelete: "cascade" }),
+  startRow: integer().notNull(),
+  endRow: integer().notNull(),
+  price: integer().notNull(),
+  seatsPerRow: integer().notNull(),
+});
+
+export const ticketsTable = pgTable(
+  "tickets",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    seatCategoryId: uuid()
+      .notNull()
+      .references(() => seatCategoriesTable.id, { onDelete: "cascade" }),
+    row: integer().notNull(),
+    seatNumber: integer().notNull(),
+  },
+  (table) => [
+    unique("tickets_seat_unique").on(table.seatCategoryId, table.row, table.seatNumber),
+  ],
+);
