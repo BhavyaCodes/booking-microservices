@@ -53,12 +53,17 @@ const app = new Hono<{
     requireAdmin,
     zValidator(
       "json",
-      z.object({
-        startRow: z.number().int().min(1),
-        endRow: z.number().int().min(1),
-        price: z.number().int().min(1),
-        seatsPerRow: z.number().int().min(1),
-      }),
+      z
+        .object({
+          startRow: z.number().int().min(1),
+          endRow: z.number().int().min(1),
+          price: z.number().int().min(1),
+          seatsPerRow: z.number().int().min(1),
+        })
+        .refine((data) => data.endRow >= data.startRow, {
+          path: ["endRow"],
+          message: "endRow must be greater than or equal to startRow",
+        }),
     ),
     async (c) => {
       const { eventId } = c.req.param();
