@@ -9,6 +9,15 @@ import { db } from "./db";
 import { eventsTable, seatCategoriesTable, ticketsTable } from "./db/schema";
 import { count } from "drizzle-orm";
 
+// Helper function to calculate total tickets
+const calculateTotalTickets = (
+  startRow: number,
+  endRow: number,
+  seatsPerRow: number,
+): number => {
+  return (endRow - startRow + 1) * seatsPerRow;
+};
+
 const app = new Hono<{
   Variables: {
     currentUser: CurrentUser;
@@ -68,8 +77,11 @@ const app = new Hono<{
         })
         .refine(
           (data) => {
-            const totalTickets =
-              (data.endRow - data.startRow + 1) * data.seatsPerRow;
+            const totalTickets = calculateTotalTickets(
+              data.startRow,
+              data.endRow,
+              data.seatsPerRow,
+            );
             return totalTickets <= 10000;
           },
           {
@@ -164,7 +176,7 @@ const app = new Hono<{
 
           // Insert tickets in batches to avoid memory issues and database query size limits
           const BATCH_SIZE = 1000;
-          const newTickets: {
+          let newTickets: {
             seatCategoryId: string;
             row: number;
             seatNumber: number;
@@ -181,7 +193,7 @@ const app = new Hono<{
               // Insert batch when it reaches BATCH_SIZE
               if (newTickets.length === BATCH_SIZE) {
                 await tx.insert(ticketsTable).values(newTickets);
-                newTickets.length = 0; // Clear the array
+                newTickets = []; // Clear the array and free memory
               }
             }
           }
