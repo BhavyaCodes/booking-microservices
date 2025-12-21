@@ -108,13 +108,18 @@ const app = new Hono<{
             })
             .returning();
 
-          const newTickets: { seatCategoryId: string; row: number }[] = [];
+          const newTickets: {
+            seatCategoryId: string;
+            row: number;
+            seatNumber: number;
+          }[] = [];
 
           for (let row = startRow; row <= endRow; row++) {
             for (let seat = 1; seat <= seatsPerRow; seat++) {
               newTickets.push({
                 seatCategoryId: newSeatCategory[0].id,
                 row: row,
+                seatNumber: seat,
               });
             }
           }

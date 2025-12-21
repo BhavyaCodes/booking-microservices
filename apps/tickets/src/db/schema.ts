@@ -33,4 +33,5 @@ export const ticketsTable = pgTable("tickets", {
     .notNull()
     .references(() => seatCategoriesTable.id, { onDelete: "cascade" }),
   row: integer().notNull(),
+  seatNumber: integer().notNull(),
 });
