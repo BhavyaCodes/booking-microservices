@@ -222,6 +222,71 @@ describe("add seat categories to event", () => {
     expect(newSeatCategoryResponse.status).toBe(201);
   });
 
+  it("Should throw 404 when event is not found", async () => {
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+    const newSeatCategoryResponse = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 10,
+          price: 100,
+          seatsPerRow: 20,
+        },
+        param: {
+          eventId: "4bf3ac96-b320-4a58-836a-4ddcab494c17",
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(newSeatCategoryResponse.status).toBe(404);
+  });
+
+  it("should throw 400 when event is not in draft mode", async () => {
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+    const newEvent = await db
+      .insert(eventsTable)
+      .values({
+        title: "Published Event",
+        desc: "Some event description",
+        date: new Date(new Date().getTime() + 3600 * 1000),
+        draft: false,
+        imageUrl: "https://example.com/image.jpg",
+      })
+      .returning();
+
+    const newSeatCategoryResponse = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 10,
+          price: 100,
+          seatsPerRow: 20,
+        },
+        param: {
+          eventId: newEvent[0].id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(newSeatCategoryResponse.status).toBe(400);
+  });
+
   it("should add tickets when seat category is created", async () => {
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
