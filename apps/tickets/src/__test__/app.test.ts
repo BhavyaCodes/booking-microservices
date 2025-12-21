@@ -343,78 +343,123 @@ describe("add seat categories to event", () => {
     expect(tickets.length).toBe(50);
   });
 
-  it("should be able to add multiple seat categories to an event", async () => {
-    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+  describe("should not be able to add multiple seat categories if rows overlap", async () => {
+    const setup = async (
+      s1: number,
+      e1: number,
+      s2: number,
+      e2: number,
+    ): Promise<{
+      status1: number;
+      status2: number;
+    }> => {
+      const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-    const newEventResponse = await client.api.tickets.events.$post(
-      {
-        json: {
-          date: new Date(new Date().getTime() + 3600 * 1000),
+      const newEventResponse = await client.api.tickets.events.$post(
+        {
+          json: {
+            date: new Date(new Date().getTime() + 3600 * 1000),
 
-          desc: "Some event description",
-          title: "Event for seat category",
-          imageUrl: "https://example.com/image.jpg",
+            desc: "Some event description",
+            title: "Event for seat category",
+            imageUrl: "https://example.com/image.jpg",
+          },
         },
-      },
-      {
-        headers: {
-          Cookie: cookieJwt,
+        {
+          headers: {
+            Cookie: cookieJwt,
+          },
         },
-      },
-    );
+      );
 
-    const newEvent = await newEventResponse.json();
+      const newEvent = await newEventResponse.json();
 
-    const newSeatCategoryResponse = await client.api.tickets.events[":eventId"][
-      "seat-categories"
-    ].$post(
-      {
-        json: {
-          startRow: 1,
-          endRow: 10,
-          price: 100,
-          seatsPerRow: 20,
+      const newSeatCategoryResponse = await client.api.tickets.events[
+        ":eventId"
+      ]["seat-categories"].$post(
+        {
+          json: {
+            startRow: s1,
+            endRow: e1,
+            price: 100,
+            seatsPerRow: 20,
+          },
+          param: {
+            eventId: newEvent.id,
+          },
         },
-        param: {
-          eventId: newEvent.id,
+        {
+          headers: {
+            Cookie: cookieJwt,
+          },
         },
-      },
-      {
-        headers: {
-          Cookie: cookieJwt,
-        },
-      },
-    );
+      );
 
-    const newSeatCategoryResponse2 = await client.api.tickets.events[
-      ":eventId"
-    ]["seat-categories"].$post(
-      {
-        json: {
-          startRow: 1,
-          endRow: 10,
-          price: 100,
-          seatsPerRow: 20,
+      const newSeatCategoryResponse2 = await client.api.tickets.events[
+        ":eventId"
+      ]["seat-categories"].$post(
+        {
+          json: {
+            startRow: s2,
+            endRow: e2,
+            price: 100,
+            seatsPerRow: 20,
+          },
+          param: {
+            eventId: newEvent.id,
+          },
         },
-        param: {
-          eventId: newEvent.id,
+        {
+          headers: {
+            Cookie: cookieJwt,
+          },
         },
-      },
-      {
-        headers: {
-          Cookie: cookieJwt,
-        },
-      },
-    );
+      );
 
-    expect(newSeatCategoryResponse.status).toBe(201);
-    expect(newSeatCategoryResponse2.status).toBe(201);
-
-    const eventSeatCategories = await db.query.seatCategoriesTable.findMany({
-      where: (seatCategoriesTable, { eq }) =>
-        eq(seatCategoriesTable.eventId, newEvent.id),
+      return {
+        status1: newSeatCategoryResponse.status,
+        status2: newSeatCategoryResponse2.status,
+      };
+    };
+    it("should not pass 1 - 10 and 5 - 15", async () => {
+      const { status1, status2 } = await setup(1, 10, 5, 15);
+      expect(status1).toBe(201);
+      expect(status2).toBe(400);
     });
 
-    expect(eventSeatCategories.length).toBe(2);
+    it("should not pass 1 - 10 and 10 - 20", async () => {
+      const { status1, status2 } = await setup(1, 10, 10, 20);
+      expect(status1).toBe(201);
+      expect(status2).toBe(400);
+    });
+
+    it("should not pass 1 - 10 and 2 - 8", async () => {
+      const { status1, status2 } = await setup(1, 10, 2, 8);
+      expect(status1).toBe(201);
+      expect(status2).toBe(400);
+    });
+    it("should not pass 10 - 15 and 8 - 20", async () => {
+      const { status1, status2 } = await setup(10, 15, 8, 20);
+      expect(status1).toBe(201);
+      expect(status2).toBe(400);
+    });
+
+    it("should not pass 5 - 25 and 1 - 10", async () => {
+      const { status1, status2 } = await setup(5, 25, 1, 10);
+      expect(status1).toBe(201);
+      expect(status2).toBe(400);
+    });
+
+    it("should pass 1 - 5 and 6 - 10", async () => {
+      const { status1, status2 } = await setup(1, 5, 6, 10);
+      expect(status1).toBe(201);
+      expect(status2).toBe(201);
+    });
+
+    it("should pass 1 - 10 and 11 - 20", async () => {
+      const { status1, status2 } = await setup(1, 10, 11, 20);
+      expect(status1).toBe(201);
+      expect(status2).toBe(201);
+    });
   });
 });
