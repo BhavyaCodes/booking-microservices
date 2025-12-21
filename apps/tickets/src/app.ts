@@ -131,7 +131,6 @@ const app = new Hono<{
 
           await tx.insert(ticketsTable).values(newTickets);
 
-          // return c.json({ newSeatCategory: newSeatCategory[0] }, 201);
           return newSeatCategory[0];
         } catch (error) {
           tx.rollback();
