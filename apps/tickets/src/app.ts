@@ -52,6 +52,7 @@ const app = new Hono<{
   .post(
     "/api/tickets/events/:eventId/seat-categories",
     requireAdmin,
+    zValidator("param", z.object({ eventId: z.uuid() })),
     zValidator(
       "json",
       z
