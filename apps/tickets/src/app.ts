@@ -102,43 +102,43 @@ const app = new Hono<{
 
       const { startRow, endRow, price, seatsPerRow } = c.req.valid("json");
 
-      // check for overlapping rows with existing seat categories
-
-      const existingSeatCategoriesForEvent =
-        await db.query.seatCategoriesTable.findMany({
-          where: (seatCategoriesTable, { eq }) =>
-            eq(seatCategoriesTable.eventId, eventId),
-        });
-
-      const hasOverlap = existingSeatCategoriesForEvent.some((category) => {
-        if (startRow >= category.startRow && startRow <= category.endRow) {
-          return true;
-        }
-
-        if (endRow >= category.startRow && endRow <= category.endRow) {
-          return true;
-        }
-
-        if (startRow <= category.startRow && endRow >= category.endRow) {
-          return true;
-        }
-        return false;
-      });
-
-      if (hasOverlap) {
-        throw new HTTPException(400, {
-          res: new Response(
-            JSON.stringify({
-              message: "Seat category rows overlap with existing categories",
-            }),
-            {
-              headers: { "Content-Type": "application/json" },
-            },
-          ),
-        });
-      }
-
       const newSeatCategory = await db.transaction(async (tx) => {
+        // check for overlapping rows with existing seat categories
+
+        const existingSeatCategoriesForEvent =
+          await tx.query.seatCategoriesTable.findMany({
+            where: (seatCategoriesTable, { eq }) =>
+              eq(seatCategoriesTable.eventId, eventId),
+          });
+
+        const hasOverlap = existingSeatCategoriesForEvent.some((category) => {
+          if (startRow >= category.startRow && startRow <= category.endRow) {
+            return true;
+          }
+
+          if (endRow >= category.startRow && endRow <= category.endRow) {
+            return true;
+          }
+
+          if (startRow <= category.startRow && endRow >= category.endRow) {
+            return true;
+          }
+          return false;
+        });
+
+        if (hasOverlap) {
+          throw new HTTPException(400, {
+            res: new Response(
+              JSON.stringify({
+                message: "Seat category rows overlap with existing categories",
+              }),
+              {
+                headers: { "Content-Type": "application/json" },
+              },
+            ),
+          });
+        }
+
         try {
           const newSeatCategory = await tx
             .insert(seatCategoriesTable)
