@@ -5,6 +5,7 @@ import {
   timestamp,
   boolean,
   integer,
+  unique,
 } from "drizzle-orm/pg-core";
 
 export const eventsTable = pgTable("events", {
@@ -27,11 +28,17 @@ export const seatCategoriesTable = pgTable("seat_categories", {
   seatsPerRow: integer().notNull(),
 });
 
-export const ticketsTable = pgTable("tickets", {
-  id: uuid().primaryKey().defaultRandom(),
-  seatCategoryId: uuid()
-    .notNull()
-    .references(() => seatCategoriesTable.id, { onDelete: "cascade" }),
-  row: integer().notNull(),
-  seatNumber: integer().notNull(),
-});
+export const ticketsTable = pgTable(
+  "tickets",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    seatCategoryId: uuid()
+      .notNull()
+      .references(() => seatCategoriesTable.id, { onDelete: "cascade" }),
+    row: integer().notNull(),
+    seatNumber: integer().notNull(),
+  },
+  (table) => [
+    unique("tickets_seat_unique").on(table.seatCategoryId, table.row, table.seatNumber),
+  ],
+);
