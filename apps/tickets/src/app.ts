@@ -102,44 +102,44 @@ const app = new Hono<{
 
       const { startRow, endRow, price, seatsPerRow } = c.req.valid("json");
 
-      // check for overlapping rows with existing seat categories
-
-      const existingSeatCategoriesForEvent =
-        await db.query.seatCategoriesTable.findMany({
-          where: (seatCategoriesTable, { eq }) =>
-            eq(seatCategoriesTable.eventId, eventId),
-        });
-
-      const hasOverlap = existingSeatCategoriesForEvent.some((category) => {
-        if (startRow >= category.startRow && startRow <= category.endRow) {
-          return true;
-        }
-
-        if (endRow >= category.startRow && endRow <= category.endRow) {
-          return true;
-        }
-
-        if (startRow <= category.startRow && endRow >= category.endRow) {
-          return true;
-        }
-        return false;
-      });
-
-      if (hasOverlap) {
-        throw new HTTPException(400, {
-          res: new Response(
-            JSON.stringify({
-              message: "Seat category rows overlap with existing categories",
-            }),
-            {
-              headers: { "Content-Type": "application/json" },
-            },
-          ),
-        });
-      }
-
       const newSeatCategory = await db.transaction(async (tx) => {
         try {
+          // check for overlapping rows with existing seat categories
+          // This check is now inside the transaction to prevent race conditions
+          const existingSeatCategoriesForEvent =
+            await tx.query.seatCategoriesTable.findMany({
+              where: (seatCategoriesTable, { eq }) =>
+                eq(seatCategoriesTable.eventId, eventId),
+            });
+
+          const hasOverlap = existingSeatCategoriesForEvent.some((category) => {
+            if (startRow >= category.startRow && startRow <= category.endRow) {
+              return true;
+            }
+
+            if (endRow >= category.startRow && endRow <= category.endRow) {
+              return true;
+            }
+
+            if (startRow <= category.startRow && endRow >= category.endRow) {
+              return true;
+            }
+            return false;
+          });
+
+          if (hasOverlap) {
+            throw new HTTPException(400, {
+              res: new Response(
+                JSON.stringify({
+                  message: "Seat category rows overlap with existing categories",
+                }),
+                {
+                  headers: { "Content-Type": "application/json" },
+                },
+              ),
+            });
+          }
+
           const newSeatCategory = await tx
             .insert(seatCategoriesTable)
             .values({
@@ -171,6 +171,10 @@ const app = new Hono<{
 
           return newSeatCategory[0];
         } catch (error) {
+          // Re-throw HTTPException errors to preserve status codes
+          if (error instanceof HTTPException) {
+            throw error;
+          }
           // tx.rollback(); // Explicit rollback is not needed; Drizzle ORM handles it automatically
           console.error("Error creating seat category and tickets:", error);
           throw new HTTPException(500, {
