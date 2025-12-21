@@ -7,6 +7,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db } from "./db";
 import { eventsTable, seatCategoriesTable, ticketsTable } from "./db/schema";
+import { count } from "drizzle-orm";
 
 const app = new Hono<{
   Variables: {
@@ -101,6 +102,7 @@ const app = new Hono<{
       const { startRow, endRow, price, seatsPerRow } = c.req.valid("json");
 
       // check for overlapping rows with existing seat categories
+
       const existingSeatCategoriesForEvent =
         await db.query.seatCategoriesTable.findMany({
           where: (seatCategoriesTable, { eq }) =>
@@ -168,7 +170,7 @@ const app = new Hono<{
 
           return newSeatCategory[0];
         } catch (error) {
-          tx.rollback();
+          // tx.rollback(); // Explicit rollback is not needed; Drizzle ORM handles it automatically
           console.error("Error creating seat category and tickets:", error);
           throw new HTTPException(500, {
             res: new Response(
@@ -186,6 +188,19 @@ const app = new Hono<{
       return c.json(newSeatCategory, 201);
     },
   )
+  .get("/api/tickets/db-info", requireAdmin, async (c) => {
+    const eventsCount = await db.select({ count: count() }).from(eventsTable);
+    const seatCategoriesCount = await db
+      .select({ count: count() })
+      .from(seatCategoriesTable);
+    const ticketsCount = await db.select({ count: count() }).from(ticketsTable);
+
+    return c.json({
+      eventsCount: eventsCount[0].count,
+      seatCategoriesCount: seatCategoriesCount[0].count,
+      ticketsCount: ticketsCount[0].count,
+    });
+  })
   .onError((error, c) => {
     if (error instanceof HTTPException) {
       return error.getResponse();
