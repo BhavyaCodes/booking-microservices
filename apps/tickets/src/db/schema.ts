@@ -39,6 +39,6 @@ export const ticketsTable = pgTable(
     seatNumber: integer().notNull(),
   },
   (table) => [
-    unique().on(table.seatCategoryId, table.row, table.seatNumber),
+    unique("tickets_seat_unique").on(table.seatCategoryId, table.row, table.seatNumber),
   ],
 );
