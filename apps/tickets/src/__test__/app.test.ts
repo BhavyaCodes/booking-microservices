@@ -489,4 +489,109 @@ describe("add seat categories to event", () => {
       expect(status2).toBe(201);
     });
   });
+
+  describe("validate maximum ticket limit", () => {
+    it("should reject seat category creation when total tickets exceed 10,000", async () => {
+      const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+      const newEventResponse = await client.api.tickets.events.$post(
+        {
+          json: {
+            date: new Date(new Date().getTime() + 3600 * 1000),
+            desc: "Some event description",
+            title: "Event for large seat category",
+            imageUrl: "https://example.com/image.jpg",
+          },
+        },
+        {
+          headers: {
+            Cookie: cookieJwt,
+          },
+        },
+      );
+
+      const newEvent = await newEventResponse.json();
+
+      // 101 rows * 100 seats = 10,100 tickets (exceeds limit)
+      const newSeatCategoryResponse = await client.api.tickets.events[
+        ":eventId"
+      ]["seat-categories"].$post(
+        {
+          json: {
+            startRow: 1,
+            endRow: 101,
+            price: 100,
+            seatsPerRow: 100,
+          },
+          param: {
+            eventId: newEvent.id,
+          },
+        },
+        {
+          headers: {
+            Cookie: cookieJwt,
+          },
+        },
+      );
+
+      expect(newSeatCategoryResponse.status).toBe(400);
+      const errorResponse = await newSeatCategoryResponse.json();
+      expect(errorResponse.error).toBeDefined();
+    });
+
+    it("should allow seat category creation when total tickets is exactly 10,000", async () => {
+      const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+      const newEventResponse = await client.api.tickets.events.$post(
+        {
+          json: {
+            date: new Date(new Date().getTime() + 3600 * 1000),
+            desc: "Some event description",
+            title: "Event for max seat category",
+            imageUrl: "https://example.com/image.jpg",
+          },
+        },
+        {
+          headers: {
+            Cookie: cookieJwt,
+          },
+        },
+      );
+
+      const newEvent = await newEventResponse.json();
+
+      // 100 rows * 100 seats = 10,000 tickets (exactly at limit)
+      const newSeatCategoryResponse = await client.api.tickets.events[
+        ":eventId"
+      ]["seat-categories"].$post(
+        {
+          json: {
+            startRow: 1,
+            endRow: 100,
+            price: 100,
+            seatsPerRow: 100,
+          },
+          param: {
+            eventId: newEvent.id,
+          },
+        },
+        {
+          headers: {
+            Cookie: cookieJwt,
+          },
+        },
+      );
+
+      expect(newSeatCategoryResponse.status).toBe(201);
+
+      const newSeatCategory = await newSeatCategoryResponse.json();
+
+      const tickets = await db.query.ticketsTable.findMany({
+        where: (ticketsTable, { eq }) =>
+          eq(ticketsTable.seatCategoryId, newSeatCategory.id),
+      });
+
+      expect(tickets.length).toBe(10000);
+    });
+  });
 });

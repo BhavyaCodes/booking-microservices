@@ -65,7 +65,18 @@ const app = new Hono<{
         .refine((data) => data.endRow >= data.startRow, {
           path: ["endRow"],
           message: "endRow must be greater than or equal to startRow",
-        }),
+        })
+        .refine(
+          (data) => {
+            const totalTickets =
+              (data.endRow - data.startRow + 1) * data.seatsPerRow;
+            return totalTickets <= 10000;
+          },
+          {
+            message:
+              "Total number of tickets cannot exceed 10,000. Please reduce the number of rows or seats per row.",
+          },
+        ),
     ),
     async (c) => {
       const { eventId } = c.req.param();
@@ -151,6 +162,8 @@ const app = new Hono<{
             })
             .returning();
 
+          // Insert tickets in batches to avoid memory issues and database query size limits
+          const BATCH_SIZE = 1000;
           const newTickets: {
             seatCategoryId: string;
             row: number;
@@ -164,10 +177,19 @@ const app = new Hono<{
                 row: row,
                 seatNumber: seat,
               });
+
+              // Insert batch when it reaches BATCH_SIZE
+              if (newTickets.length === BATCH_SIZE) {
+                await tx.insert(ticketsTable).values(newTickets);
+                newTickets.length = 0; // Clear the array
+              }
             }
           }
 
-          await tx.insert(ticketsTable).values(newTickets);
+          // Insert any remaining tickets
+          if (newTickets.length > 0) {
+            await tx.insert(ticketsTable).values(newTickets);
+          }
 
           return newSeatCategory[0];
         } catch (error) {
