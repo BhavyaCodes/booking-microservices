@@ -6,7 +6,7 @@ import { CurrentUser } from "@booking/common/interfaces";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db } from "./db";
-import { eventsTable } from "./db/schema";
+import { eventsTable, seatCategoriesTable, ticketsTable } from "./db/schema";
 
 const app = new Hono<{
   Variables: {
@@ -46,6 +46,100 @@ const app = new Hono<{
         .returning();
 
       return c.json(newEvent[0], 201);
+    },
+  )
+  .post(
+    "/api/tickets/events/:eventId/seat-categories",
+    requireAdmin,
+    zValidator(
+      "json",
+      z.object({
+        startRow: z.number().int().min(1),
+        endRow: z.number().int().min(1),
+        price: z.number().int().min(1),
+        seatsPerRow: z.number().int().min(1),
+      }),
+    ),
+    async (c) => {
+      const { eventId } = c.req.param();
+
+      const event = await db.query.eventsTable.findFirst({
+        where: (eventsTable, { eq }) => eq(eventsTable.id, eventId),
+      });
+
+      if (!event) {
+        throw new HTTPException(404, {
+          res: new Response(
+            JSON.stringify({
+              message: "Event not found",
+            }),
+            {
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+        });
+      }
+
+      if (!event.draft) {
+        throw new HTTPException(400, {
+          res: new Response(
+            JSON.stringify({
+              message: "Event is not in draft mode",
+            }),
+            {
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+        });
+      }
+
+      const { startRow, endRow, price, seatsPerRow } = c.req.valid("json");
+
+      const newSeatCategory = await db.transaction(async (tx) => {
+        try {
+          const newSeatCategory = await tx
+            .insert(seatCategoriesTable)
+            .values({
+              eventId: eventId,
+              startRow,
+              endRow,
+              price,
+              seatsPerRow,
+            })
+            .returning();
+
+          const newTickets: { seatCategoryId: string; row: number }[] = [];
+
+          for (let row = startRow; row <= endRow; row++) {
+            for (let seat = 1; seat <= seatsPerRow; seat++) {
+              newTickets.push({
+                seatCategoryId: newSeatCategory[0].id,
+                row: row,
+              });
+            }
+          }
+
+          await tx.insert(ticketsTable).values(newTickets);
+
+          // return c.json({ newSeatCategory: newSeatCategory[0] }, 201);
+          return newSeatCategory[0];
+        } catch (error) {
+          tx.rollback();
+          console.error("Error creating seat category and tickets:", error);
+          throw new HTTPException(500, {
+            res: new Response(
+              JSON.stringify({
+                message: "Failed to create seat category and tickets",
+              }),
+              {
+                headers: { "Content-Type": "application/json" },
+              },
+            ),
+          });
+        }
+      });
+
+      return c.json(newSeatCategory, 201);
     },
   )
   .onError((error, c) => {

@@ -174,3 +174,182 @@ it("event should have draft set to true by default", async () => {
   expect(insertedEvent).toBeDefined();
   expect(insertedEvent!.draft).toBe(true);
 });
+
+describe("add seat categories to event", () => {
+  it("should add seat category to an event", async () => {
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+    const newEventResponse = await client.api.tickets.events.$post(
+      {
+        json: {
+          date: new Date(new Date().getTime() + 3600 * 1000),
+
+          desc: "Some event description",
+          title: "Event for seat category",
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    const newEvent = await newEventResponse.json();
+
+    const newSeatCategoryResponse = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 10,
+          price: 100,
+          seatsPerRow: 20,
+        },
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(newSeatCategoryResponse.status).toBe(201);
+  });
+
+  it("should add tickets when seat category is created", async () => {
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+    const newEventResponse = await client.api.tickets.events.$post(
+      {
+        json: {
+          date: new Date(new Date().getTime() + 3600 * 1000),
+
+          desc: "Some event description",
+          title: "Event for seat category",
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    const newEvent = await newEventResponse.json();
+
+    const newSeatCategoryResponse = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 5,
+          price: 100,
+          seatsPerRow: 10,
+        },
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(newSeatCategoryResponse.status).toBe(201);
+
+    const newSeatCategory = await newSeatCategoryResponse.json();
+
+    const tickets = await db.query.ticketsTable.findMany({
+      where: (ticketsTable, { eq }) =>
+        eq(ticketsTable.seatCategoryId, newSeatCategory.id),
+    });
+
+    // 5 rows * 10 seats per row = 50 tickets
+    expect(tickets.length).toBe(50);
+  });
+
+  it("should be able to add multiple seat categories to an event", async () => {
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+    const newEventResponse = await client.api.tickets.events.$post(
+      {
+        json: {
+          date: new Date(new Date().getTime() + 3600 * 1000),
+
+          desc: "Some event description",
+          title: "Event for seat category",
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    const newEvent = await newEventResponse.json();
+
+    const newSeatCategoryResponse = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 10,
+          price: 100,
+          seatsPerRow: 20,
+        },
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    const newSeatCategoryResponse2 = await client.api.tickets.events[
+      ":eventId"
+    ]["seat-categories"].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 10,
+          price: 100,
+          seatsPerRow: 20,
+        },
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(newSeatCategoryResponse.status).toBe(201);
+    expect(newSeatCategoryResponse2.status).toBe(201);
+
+    const eventSeatCategories = await db.query.seatCategoriesTable.findMany({
+      where: (seatCategoriesTable, { eq }) =>
+        eq(seatCategoriesTable.eventId, newEvent.id),
+    });
+
+    expect(eventSeatCategories.length).toBe(2);
+  });
+});
