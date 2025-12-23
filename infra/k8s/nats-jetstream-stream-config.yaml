@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nats-jetstream-stream-config
+  labels:
+    app: nats-jetstream
+data:
+  stream.json: |
+    {
+      "name": "booking",
+      "subjects": ["auth.*", "tickets.*"],
+      "description": "Booking events stream",
+      "retention": "limits",
+      "discard": "old",
+      "storage": "memory",
+      "num_replicas": 1
+    }

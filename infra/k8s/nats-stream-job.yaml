@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nats-stream-setup
+spec:
+  backoffLimit: 5
+  template:
+    metadata:
+      labels:
+        app: nats-jetstream
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: nats-box
+          image: natsio/nats-box:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              until nats -s nats-jetstream-srv:4222 stream ls >/dev/null 2>&1; do
+                echo "Waiting for NATS JetStream at nats-jetstream-srv:4222..."
+                sleep 2
+              done
+              echo "Creating/updating stream..."
+              nats -s nats-jetstream-srv:4222 stream add --config /config/stream.json
+              echo "Stream setup complete."
+          volumeMounts:
+            - name: stream-config
+              mountPath: /config
+      volumes:
+        - name: stream-config
+          configMap:
+            name: nats-jetstream-stream-config

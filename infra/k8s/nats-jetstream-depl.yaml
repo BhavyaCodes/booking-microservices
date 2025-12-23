@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nats-jetstream-depl
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nats-jetstream
+  template:
+    metadata:
+      labels:
+        app: nats-jetstream
+    spec:
+      containers:
+        - name: nats-jetstream
+          image: nats:latest
+          imagePullPolicy: IfNotPresent
+          args: ["--jetstream", "-m", "8222", "--name", "booking", "-D"]
+          ports:
+            - name: client
+              containerPort: 4222
+            - name: monitoring
+              containerPort: 8222
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nats-jetstream-srv
+spec:
+  type: ClusterIP
+  selector:
+    app: nats-jetstream
+  ports:
+    - name: client
+      protocol: TCP
+      port: 4222
+      targetPort: 4222
+    - name: monitoring
+      protocol: TCP
+      port: 8222
+      targetPort: 8222
