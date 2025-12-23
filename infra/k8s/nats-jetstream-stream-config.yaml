@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nats-jetstream-stream-config
+  labels:
+    app: nats-jetstream
+data:
+  stream.json: |
+    {
+      "name": "booking",
+      "subjects": ["auth.*", "tickets.*"],
+      "description": "Booking events stream",
+      "retention": "limits",
+      "discard": "old",
+      "storage": "memory",
+      "num_replicas": 1
+    }
+  ticketsConsumer.json: |
+    {
+      "durable_name": "tickets-service-durable",
+      "description": "Durable consumer for tickets service",
+      "stream_name": "booking",
+      "filter_subject": "tickets.*",
+      "deliver_policy": "all",
+      "ack_policy": "explicit",
+      "replay_policy": "instant",
+      "max_ack_pending": 128
+    }
