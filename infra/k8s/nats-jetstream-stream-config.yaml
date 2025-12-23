@@ -15,3 +15,14 @@ data:
       "storage": "memory",
       "num_replicas": 1
     }
+  ticketsConsumer.json: |
+    {
+      "durable_name": "tickets-service-durable",
+      "description": "Durable consumer for tickets service",
+      "stream_name": "booking",
+      "filter_subject": "tickets.*",
+      "deliver_policy": "all",
+      "ack_policy": "explicit",
+      "replay_policy": "instant",
+      "max_ack_pending": 128
+    }

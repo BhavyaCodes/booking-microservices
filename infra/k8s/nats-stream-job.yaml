@@ -25,7 +25,9 @@ spec:
               done
               echo "Creating/updating stream..."
               nats -s nats-jetstream-srv:4222 stream add --config /config/stream.json
-              echo "Stream setup complete."
+              echo "Creating/updating tickets consumer..."
+              nats -s nats-jetstream-srv:4222 consumer add booking --config /config/ticketsConsumer.json
+              echo "Stream and consumer setup complete."
           volumeMounts:
             - name: stream-config
               mountPath: /config
