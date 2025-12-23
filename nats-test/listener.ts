@@ -1,7 +1,7 @@
 import { AckPolicy, connect, ReplayPolicy } from "nats";
 
 import type { Subject } from "./publisher";
-const server = "http://localhost:4222";
+const server = "nats://localhost:4222";
 
 async function main() {
   const nc = await connect({ servers: server, name: "listener-client" });

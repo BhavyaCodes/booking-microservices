@@ -6,7 +6,7 @@ import {
   StringCodec,
 } from "nats";
 
-const server = "http://localhost:4222";
+const server = "nats://localhost:4222";
 
 type SubjectPrefix = "auth" | "tickets";
 export type Subject = `${SubjectPrefix}.${string}`;
