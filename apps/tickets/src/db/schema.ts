@@ -1,15 +1,18 @@
 import {
   pgTable,
-  uuid,
   varchar,
   timestamp,
   boolean,
   integer,
   unique,
+  uuid,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const eventsTable = pgTable("events", {
-  id: uuid().primaryKey().defaultRandom(),
+  id: uuid()
+    .primaryKey()
+    .default(sql`uuidv7()`),
   title: varchar({ length: 255 }).notNull(),
   desc: varchar({ length: 1000 }).notNull(),
   date: timestamp().notNull(),
@@ -18,7 +21,9 @@ export const eventsTable = pgTable("events", {
 });
 
 export const seatCategoriesTable = pgTable("seat_categories", {
-  id: uuid().primaryKey().defaultRandom(),
+  id: uuid()
+    .primaryKey()
+    .default(sql`uuidv7()`),
   eventId: uuid()
     .notNull()
     .references(() => eventsTable.id, { onDelete: "cascade" }),
@@ -31,7 +36,9 @@ export const seatCategoriesTable = pgTable("seat_categories", {
 export const ticketsTable = pgTable(
   "tickets",
   {
-    id: uuid().primaryKey().defaultRandom(),
+    id: uuid()
+      .primaryKey()
+      .default(sql`uuidv7()`),
     seatCategoryId: uuid()
       .notNull()
       .references(() => seatCategoriesTable.id, { onDelete: "cascade" }),
@@ -39,6 +46,10 @@ export const ticketsTable = pgTable(
     seatNumber: integer().notNull(),
   },
   (table) => [
-    unique("tickets_seat_unique").on(table.seatCategoryId, table.row, table.seatNumber),
+    unique("tickets_seat_unique").on(
+      table.seatCategoryId,
+      table.row,
+      table.seatNumber,
+    ),
   ],
 );
