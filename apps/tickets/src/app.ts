@@ -8,6 +8,9 @@ import { z } from "zod";
 import { db } from "./db";
 import { eventsTable, seatCategoriesTable, ticketsTable } from "./db/schema";
 import { count } from "drizzle-orm";
+import { natsWrapper } from "./nats-wrapper";
+import { TicketCreatedPublisher } from "./events/ticket-created-publisher";
+import { TicketCreatedEvent } from "./events/events";
 
 const app = new Hono<{
   Variables: {
@@ -69,7 +72,7 @@ const app = new Hono<{
     ),
     async (c) => {
       const { eventId } = c.req.param();
-
+      const ticketCreatedPublisher = new TicketCreatedPublisher(natsWrapper.js);
       const event = await db.query.eventsTable.findFirst({
         where: (eventsTable, { eq }) => eq(eventsTable.id, eventId),
       });
@@ -167,7 +170,20 @@ const app = new Hono<{
             }
           }
 
-          await tx.insert(ticketsTable).values(newTickets);
+          const tickets = await tx
+            .insert(ticketsTable)
+            .values(newTickets)
+            .returning();
+
+          const eventData: TicketCreatedEvent["data"] = tickets.map(
+            (ticket) => ({
+              id: ticket.id,
+              price: price,
+              seatCategoryId: ticket.seatCategoryId,
+            }),
+          );
+
+          const pa = await ticketCreatedPublisher.publish(eventData);
 
           return newSeatCategory[0];
         } catch (error) {
