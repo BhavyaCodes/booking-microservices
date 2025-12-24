@@ -23,6 +23,7 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "hono": "^4.11.1"
+    "hono": "^4.11.1",
+    "nats": "^2.29.3"
   }
 }

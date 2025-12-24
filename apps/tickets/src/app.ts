@@ -10,7 +10,7 @@ import { eventsTable, seatCategoriesTable, ticketsTable } from "./db/schema";
 import { count } from "drizzle-orm";
 import { natsWrapper } from "./nats-wrapper";
 import { TicketCreatedPublisher } from "./events/ticket-created-publisher";
-import { TicketCreatedEvent } from "./events/events";
+import { TicketCreatedEvent } from "@booking/common";
 
 const app = new Hono<{
   Variables: {

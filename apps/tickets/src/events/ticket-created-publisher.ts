@@ -1,7 +1,5 @@
-import { BasePublisher } from "./base-publisher";
-import { TicketCreatedEvent } from "./events";
-import { Subjects } from "./subjects";
+import { BasePublisher, Subjects, TicketCreatedEvent } from "@booking/common";
 
 export class TicketCreatedPublisher extends BasePublisher<TicketCreatedEvent> {
-  readonly subject = Subjects.TicketCreated;
+  readonly subject = Subjects.TicketsCreated;
 }

@@ -2,8 +2,8 @@ type SubjectPrefix = "auth" | "tickets";
 export type Subject = `${SubjectPrefix}.${string}`;
 
 export enum Subjects {
-  TicketCreated = "tickets.created",
-  TicketUpdated = "tickets.updated",
+  TicketsCreated = "tickets.created",
+  TicketsUpdated = "tickets.updated",
 }
 
 // Type-level constraint: ensures all enum values conform to Subject type
