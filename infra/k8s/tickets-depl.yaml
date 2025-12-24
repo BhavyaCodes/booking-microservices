@@ -21,6 +21,26 @@ spec:
               "-c",
               "until nc -z tickets-postgres-srv 5432; do echo waiting for postgres; sleep 2; done",
             ]
+        - name: migrate-db
+          image: booking-dev-tickets:latest
+          imagePullPolicy: Never
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: booking-secrets
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: booking-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: booking-secrets
+                  key: POSTGRES_DB
+          command: ["bun", "run", "migrate:dev"]
       containers:
         - name: tickets
           image: booking-dev-tickets:latest
