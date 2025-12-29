@@ -6,6 +6,7 @@ import {
   integer,
   unique,
   uuid,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -53,3 +54,12 @@ export const ticketsTable = pgTable(
     ),
   ],
 );
+
+export const outboxTable = pgTable("outbox", {
+  id: uuid()
+    .primaryKey()
+    .default(sql`uuidv7()`),
+  subject: varchar({ length: 255 }).notNull(),
+  data: jsonb().notNull(),
+  processed: boolean().notNull().default(false),
+});
