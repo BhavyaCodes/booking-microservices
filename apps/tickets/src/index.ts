@@ -3,6 +3,7 @@ import { app } from "./app";
 import { sql } from "drizzle-orm";
 import { natsWrapper } from "./nats-wrapper";
 import { TicketCreatedListener } from "./events/ticket-created-listener";
+
 const main = async () => {
   if (!process.env.JWT_KEY) {
     throw new Error("JWT_KEY must be present");
@@ -39,6 +40,15 @@ const main = async () => {
     process.exit(-1);
   });
   console.log("🚀 ~ connected to Postgres");
+
+  // Listen for PostgreSQL notifications
+  const client = await pool.connect();
+  await client.query("LISTEN outbox_insert");
+  client.on("notification", (msg) => {
+    if (msg.channel === "outbox_insert") {
+      console.log("trigger ran");
+    }
+  });
 
   Bun.serve({
     port: 3000,

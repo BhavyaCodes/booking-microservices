@@ -6,11 +6,16 @@ import { CurrentUser } from "@booking/common/interfaces";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db } from "./db";
-import { eventsTable, seatCategoriesTable, ticketsTable } from "./db/schema";
+import {
+  eventsTable,
+  outboxTable,
+  seatCategoriesTable,
+  ticketsTable,
+} from "./db/schema";
 import { count } from "drizzle-orm";
 import { natsWrapper } from "./nats-wrapper";
 import { TicketCreatedPublisher } from "./events/ticket-created-publisher";
-import { TicketCreatedEvent } from "@booking/common";
+import { Subjects, TicketCreatedEvent } from "@booking/common";
 
 const app = new Hono<{
   Variables: {
@@ -183,7 +188,11 @@ const app = new Hono<{
             }),
           );
 
-          const pa = await ticketCreatedPublisher.publish(eventData);
+          await tx
+            .insert(outboxTable)
+            .values({ subject: Subjects.TicketsCreated, data: eventData });
+
+          // const pa = await ticketCreatedPublisher.publish(eventData);
 
           return newSeatCategory[0];
         } catch (error) {
