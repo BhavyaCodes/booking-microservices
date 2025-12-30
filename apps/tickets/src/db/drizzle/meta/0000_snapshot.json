@@ -1,5 +1,5 @@
 {
-  "id": "6bf05645-2146-41bf-81b1-e6926deb3f19",
+  "id": "26b69042-47ed-4125-a7f0-f6e2c3eb31c2",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -68,7 +68,8 @@
         },
         "subject": {
           "name": "subject",
-          "type": "varchar(255)",
+          "type": "nats_subjects",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
         },
@@ -221,7 +222,16 @@
       "isRLSEnabled": false
     }
   },
-  "enums": {},
+  "enums": {
+    "public.nats_subjects": {
+      "name": "nats_subjects",
+      "schema": "public",
+      "values": [
+        "tickets.created",
+        "tickets.updated"
+      ]
+    }
+  },
   "schemas": {},
   "sequences": {},
   "roles": {},

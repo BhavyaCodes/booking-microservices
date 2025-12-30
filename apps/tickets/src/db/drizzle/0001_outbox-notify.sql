@@ -1,4 +1,4 @@
--- Create PL/pgSQL trigger function to notify on inserts
+-- Custom SQL migration file, put your code below! ---- Create PL/pgSQL trigger function to notify on inserts
 CREATE OR REPLACE FUNCTION notify_outbox_insert()
 RETURNS trigger AS $$
 BEGIN

@@ -1,3 +1,4 @@
+CREATE TYPE "public"."nats_subjects" AS ENUM('tickets.created', 'tickets.updated');--> statement-breakpoint
 CREATE TABLE "events" (
 	"id" uuid PRIMARY KEY DEFAULT uuidv7() NOT NULL,
 	"title" varchar(255) NOT NULL,
@@ -9,7 +10,7 @@ CREATE TABLE "events" (
 --> statement-breakpoint
 CREATE TABLE "outbox" (
 	"id" uuid PRIMARY KEY DEFAULT uuidv7() NOT NULL,
-	"subject" varchar(255) NOT NULL,
+	"subject" "nats_subjects" NOT NULL,
 	"data" jsonb NOT NULL,
 	"processed" boolean DEFAULT false NOT NULL
 );
