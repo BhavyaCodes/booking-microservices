@@ -8,3 +8,4 @@ export enum Subjects {
 
 // Type-level constraint: ensures all enum values conform to Subject type
 const _validateSubjects: Record<keyof typeof Subjects, Subject> = Subjects;
+void _validateSubjects;
