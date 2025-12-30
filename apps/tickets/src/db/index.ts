@@ -17,3 +17,5 @@ export const db: NodePgDatabase<typeof schema> = drizzle(pool, {
   casing: "snake_case",
   schema,
 });
+
+export type TicketsTxn = Parameters<Parameters<typeof db.transaction>[0]>[0];

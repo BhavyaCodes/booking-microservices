@@ -1,9 +1,10 @@
-import { connect, JetStreamClient, NatsConnection } from "nats";
+import { connect, JetStreamClient, NatsConnection, StringCodec } from "nats";
 
 class NatsWrapper {
   private _nc?: NatsConnection;
   private _js?: JetStreamClient;
   private _stream?: string;
+  readonly sc = StringCodec();
 
   get nc() {
     if (!this._nc) {

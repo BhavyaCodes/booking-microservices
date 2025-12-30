@@ -8,3 +8,5 @@ export type TicketCreatedEvent = {
     seatCategoryId: string;
   }[];
 };
+
+export type NATSEvent = TicketCreatedEvent;

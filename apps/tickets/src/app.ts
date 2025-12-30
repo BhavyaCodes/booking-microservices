@@ -6,16 +6,10 @@ import { CurrentUser } from "@booking/common/interfaces";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db } from "./db";
-import {
-  eventsTable,
-  outboxTable,
-  seatCategoriesTable,
-  ticketsTable,
-} from "./db/schema";
+import { eventsTable, seatCategoriesTable, ticketsTable } from "./db/schema";
 import { count } from "drizzle-orm";
-import { natsWrapper } from "./nats-wrapper";
-import { TicketCreatedPublisher } from "./events/ticket-created-publisher";
 import { Subjects, TicketCreatedEvent } from "@booking/common";
+import { addEventToOutBox } from "./outbox";
 
 const app = new Hono<{
   Variables: {
@@ -77,7 +71,7 @@ const app = new Hono<{
     ),
     async (c) => {
       const { eventId } = c.req.param();
-      const ticketCreatedPublisher = new TicketCreatedPublisher(natsWrapper.js);
+      // const ticketCreatedPublisher = new TicketCreatedPublisher(natsWrapper.js);
       const event = await db.query.eventsTable.findFirst({
         where: (eventsTable, { eq }) => eq(eventsTable.id, eventId),
       });
@@ -188,11 +182,10 @@ const app = new Hono<{
             }),
           );
 
-          await tx
-            .insert(outboxTable)
-            .values({ subject: Subjects.TicketsCreated, data: eventData });
-
-          // const pa = await ticketCreatedPublisher.publish(eventData);
+          await addEventToOutBox(tx, {
+            subject: Subjects.TicketsCreated,
+            data: eventData,
+          });
 
           return newSeatCategory[0];
         } catch (error) {
