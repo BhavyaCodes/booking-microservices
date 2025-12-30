@@ -19,10 +19,7 @@ const main = async () => {
   }
 
   try {
-    await natsWrapper.connect(
-      "nats://nats-jetstream-srv:4222",
-      "tickets-publisher",
-    );
+    await natsWrapper.connect("nats://nats-jetstream-srv:4222");
     console.log("🚀 ~ connected to NATS JetStream!!");
 
     natsWrapper.nc.closed().then(async (err) => {

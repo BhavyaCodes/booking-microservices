@@ -3,7 +3,7 @@ import { connect, JetStreamClient, NatsConnection, StringCodec } from "nats";
 class NatsWrapper {
   private _nc?: NatsConnection;
   private _js?: JetStreamClient;
-  private _stream?: string;
+
   readonly sc = StringCodec();
 
   get nc() {
@@ -20,16 +20,11 @@ class NatsWrapper {
     return this._js;
   }
 
-  get stream() {
-    if (!this._stream) {
-      throw new Error("Cannot access NATS stream before connecting");
-    }
-    return this._stream;
-  }
-
-  // name - "booking"
-  async connect(server: string, name: string) {
-    this._stream = name;
+  // name - identifier for this NATS client (also used as the initial stream name, e.g. "tickets-publisher"
+  async connect(
+    server: string,
+    name = process.env.POD_NAME || "default-nats-client-tickets",
+  ) {
     this._nc = await connect({ servers: server, name: name });
     this._js = this._nc.jetstream();
   }
