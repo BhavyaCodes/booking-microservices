@@ -25,8 +25,9 @@ const main = async () => {
     );
     console.log("🚀 ~ connected to NATS JetStream!!");
 
-    natsWrapper.nc.closed().then((err) => {
+    natsWrapper.nc.closed().then(async (err) => {
       console.error("NATS connection closed", err);
+      await cleanup();
       process.exit(1);
     });
   } catch (error) {
@@ -55,6 +56,13 @@ const main = async () => {
     }
   });
 
+  const cleanup = async () => {
+    await notifClient.query("UNLISTEN outbox_insert");
+    await notifClient.release();
+    await natsWrapper.nc.drain();
+    await pool.end();
+  };
+
   Bun.serve({
     port: 3000,
     fetch: app.fetch,
@@ -63,18 +71,12 @@ const main = async () => {
   // Graceful shutdown
   process.on("SIGINT", async () => {
     console.log("SIGINT received");
-    await notifClient.query("UNLISTEN outbox_insert");
-    await notifClient.release();
-    await natsWrapper.nc.drain();
-    await pool.end();
+    await cleanup();
   });
 
   process.on("SIGTERM", async () => {
     console.log("SIGTERM received");
-    await notifClient.query("UNLISTEN outbox_insert");
-    await notifClient.release();
-    await natsWrapper.nc.drain();
-    await pool.end();
+    await cleanup();
   });
 };
 
