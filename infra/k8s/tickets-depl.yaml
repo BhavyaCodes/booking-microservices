@@ -51,6 +51,10 @@ spec:
                 secretKeyRef:
                   name: booking-secrets
                   key: POSTGRES_DB
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
 ---
 apiVersion: v1
 kind: Service
