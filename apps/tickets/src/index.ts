@@ -27,8 +27,8 @@ const main = async () => {
 
     natsWrapper.nc.closed().then(async (err) => {
       console.error("NATS connection closed", err);
-      await cleanup();
-      process.exit(1);
+      // await cleanup();
+      // process.exit(1);
     });
   } catch (error) {
     console.error("Failed to connect to NATS JetStream", error);
