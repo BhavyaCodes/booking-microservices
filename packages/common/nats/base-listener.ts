@@ -10,7 +10,6 @@ export abstract class BaseListener<T extends Event> {
   abstract subject: T["subject"];
   abstract onMessage(msg: JsMsg): void;
   abstract stream: string;
-  protected ackWait = 5 * 1000;
 
   protected js: JetStreamClient;
 
