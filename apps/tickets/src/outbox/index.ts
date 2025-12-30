@@ -6,7 +6,7 @@ import { natsWrapper } from "../nats-wrapper";
 import { PubAck } from "nats";
 
 export const outboxPublisher = async () => {
-  db.transaction(async (tx) => {
+  await db.transaction(async (tx) => {
     const insertedOutboxEvents = await tx
       .select()
       .from(outboxTable)
@@ -19,7 +19,7 @@ export const outboxPublisher = async () => {
       return;
     }
 
-    const natsQueue = insertedOutboxEvents.map(async (event, index) => {
+    const natsQueue = insertedOutboxEvents.map(async (event) => {
       return new Promise<{ docId: string; pa: PubAck }>(
         async (resolve, reject) => {
           try {
@@ -28,7 +28,7 @@ export const outboxPublisher = async () => {
               natsWrapper.sc.encode(JSON.stringify(event.data)),
             );
 
-            resolve({ docId: insertedOutboxEvents[index].id, pa });
+            resolve({ docId: event.id, pa });
           } catch (error) {
             console.error("🚀 ~ outboxPublisher ~ event,error:", event, error);
 
