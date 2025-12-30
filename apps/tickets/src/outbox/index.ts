@@ -6,7 +6,7 @@ import { natsWrapper } from "../nats-wrapper";
 import { PubAck } from "nats";
 
 export const outboxPublisher = async () => {
-  db.transaction(async (tx) => {
+  await db.transaction(async (tx) => {
     const insertedOutboxEvents = await tx
       .select()
       .from(outboxTable)
