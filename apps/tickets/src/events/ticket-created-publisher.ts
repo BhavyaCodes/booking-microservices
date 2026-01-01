@@ -3,3 +3,5 @@
 // export class TicketCreatedPublisher extends BasePublisher<TicketCreatedEvent> {
 //   readonly subject = Subjects.TicketsCreated;
 // }
+
+export {};
