@@ -6,62 +6,72 @@ import { natsWrapper } from "../nats-wrapper";
 import { PubAck } from "@nats-io/jetstream/lib/types";
 
 export const outboxPublisher = async () => {
-  await db.transaction(async (tx) => {
-    const insertedOutboxEvents = await tx
-      .select()
-      .from(outboxTable)
-      .orderBy(asc(outboxTable.id))
-      .limit(25)
-      .where(eq(outboxTable.processed, false))
-      .for("update", { skipLocked: true });
+  await db
+    .transaction(async (tx) => {
+      try {
+        const insertedOutboxEvents = await tx
+          .select()
+          .from(outboxTable)
+          .orderBy(asc(outboxTable.id))
+          .limit(25)
+          .where(eq(outboxTable.processed, false))
+          .for("update", { skipLocked: true });
 
-    if (insertedOutboxEvents.length === 0) {
-      return;
-    }
+        if (insertedOutboxEvents.length === 0) {
+          return;
+        }
 
-    const natsQueue = insertedOutboxEvents.map(async (event) => {
-      return new Promise<{ docId: string; pa: PubAck }>(
-        async (resolve, reject) => {
-          try {
-            const pa = await natsWrapper.js.publish(
-              event.subject,
-              JSON.stringify(event.data),
-              { msgID: event.id },
-            );
-            resolve({ docId: event.id, pa });
-          } catch (error) {
-            console.error("🚀 ~ outboxPublisher ~ event,error:", event, error);
+        const natsQueue = insertedOutboxEvents.map(async (event) => {
+          return new Promise<{ docId: string; pa: PubAck }>(
+            async (resolve, reject) => {
+              try {
+                const pa = await natsWrapper.js.publish(
+                  event.subject,
+                  JSON.stringify(event.data),
+                  { msgID: event.id },
+                );
+                resolve({ docId: event.id, pa });
+              } catch (error) {
+                console.error(
+                  "🚀 ~ outboxPublisher ~ event,error:",
+                  event,
+                  error,
+                );
 
-            reject(error);
+                reject(error);
+              }
+            },
+          );
+        });
+
+        const results = await Promise.allSettled(natsQueue);
+
+        /**
+         * array to hold outbox IDs of successfully published events
+         */
+        const successfulPublishesOutboxIds: string[] = [];
+
+        for (const result of results) {
+          if (result.status === "fulfilled") {
+            successfulPublishesOutboxIds.push(result.value.docId);
           }
-        },
-      );
-    });
+        }
 
-    const results = await Promise.allSettled(natsQueue);
-
-    /**
-     * array to hold outbox IDs of successfully published events
-     */
-    const successfulPublishesOutboxIds: string[] = [];
-
-    for (const result of results) {
-      if (result.status === "fulfilled") {
-        successfulPublishesOutboxIds.push(result.value.docId);
+        // update the outbox events as processed
+        if (successfulPublishesOutboxIds.length > 0) {
+          const result = await tx
+            .update(outboxTable)
+            .set({ processed: true })
+            .where(inArray(outboxTable.id, successfulPublishesOutboxIds));
+          console.log("🚀 ~ processed updated to true count:", result.rowCount);
+        }
+      } catch (error) {
+        console.error("Error in outboxPublisher transaction:", error);
       }
-    }
-
-    // update the outbox events as processed
-    if (successfulPublishesOutboxIds.length > 0) {
-      const result = await tx
-        .update(outboxTable)
-        .set({ processed: true })
-        .where(inArray(outboxTable.id, successfulPublishesOutboxIds));
-      console.log("🚀 ~ processed updated to true count:", result.rowCount);
-    }
-
-    // await natsWrapper.js.publish();
-  });
+    })
+    .catch((err) => {
+      console.error("Failed to process outbox events in transaction", err);
+    });
 };
 
 export const addEventToOutBox = async (tx: TicketsTxn, event: NATSEvent) => {
