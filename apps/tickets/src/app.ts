@@ -71,7 +71,6 @@ const app = new Hono<{
     ),
     async (c) => {
       const { eventId } = c.req.param();
-      // const ticketCreatedPublisher = new TicketCreatedPublisher(natsWrapper.js);
       const event = await db.query.eventsTable.findFirst({
         where: (eventsTable, { eq }) => eq(eventsTable.id, eventId),
       });
