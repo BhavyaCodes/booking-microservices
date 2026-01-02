@@ -8,6 +8,8 @@ import { z } from "zod";
 import { db } from "./db";
 import { eventsTable, seatCategoriesTable, ticketsTable } from "./db/schema";
 import { count } from "drizzle-orm";
+import { Subjects, TicketCreatedEvent } from "@booking/common";
+import { addEventToOutBox } from "./outbox";
 
 const app = new Hono<{
   Variables: {
@@ -69,7 +71,6 @@ const app = new Hono<{
     ),
     async (c) => {
       const { eventId } = c.req.param();
-
       const event = await db.query.eventsTable.findFirst({
         where: (eventsTable, { eq }) => eq(eventsTable.id, eventId),
       });
@@ -167,7 +168,23 @@ const app = new Hono<{
             }
           }
 
-          await tx.insert(ticketsTable).values(newTickets);
+          const tickets = await tx
+            .insert(ticketsTable)
+            .values(newTickets)
+            .returning();
+
+          const eventData: TicketCreatedEvent["data"] = tickets.map(
+            (ticket) => ({
+              id: ticket.id,
+              price: price,
+              seatCategoryId: ticket.seatCategoryId,
+            }),
+          );
+
+          await addEventToOutBox(tx, {
+            subject: Subjects.TicketsCreated,
+            data: eventData,
+          });
 
           return newSeatCategory[0];
         } catch (error) {

@@ -7,7 +7,7 @@ const connectionString =
     ? "postgresql://test:test@localhost:5432/test"
     : `postgresql://${process.env.POSTGRES_USER}:${process.env.POSTGRES_PASSWORD}@tickets-postgres-srv:5432/${process.env.POSTGRES_DB}`;
 
-const pool = new Pool({
+export const pool = new Pool({
   connectionString,
   max: 10,
   idleTimeoutMillis: 30000,
@@ -17,3 +17,5 @@ export const db: NodePgDatabase<typeof schema> = drizzle(pool, {
   casing: "snake_case",
   schema,
 });
+
+export type TicketsTxn = Parameters<Parameters<typeof db.transaction>[0]>[0];

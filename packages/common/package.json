@@ -7,13 +7,19 @@
   "private": true,
   "exports": {
     ".": {
-      "import": "./index.ts"
+      "import": "./index.ts",
+      "require": "./index.ts",
+      "default": "./index.ts"
     },
     "./middlewares": {
-      "import": "./middlewares/index.ts"
+      "import": "./middlewares/index.ts",
+      "require": "./middlewares/index.ts",
+      "default": "./middlewares/index.ts"
     },
     "./interfaces": {
-      "import": "./interfaces/index.ts"
+      "import": "./interfaces/index.ts",
+      "require": "./interfaces/index.ts",
+      "default": "./interfaces/index.ts"
     }
   },
   "devDependencies": {
@@ -23,6 +29,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@nats-io/jetstream": "^3.3.0",
     "hono": "^4.11.1"
   }
 }

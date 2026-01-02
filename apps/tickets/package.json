@@ -5,15 +5,19 @@
   "type": "module",
   "main": "./src/index.ts",
   "scripts": {
-    "dev:server": "bun run --hot src/index.ts",
+    "drizzle-kit:generate-dev": "drizzle-kit generate --config=./src/db/drizzle.config.ts",
+    "drizzle-kit:migrate-dev": "drizzle-kit migrate --config=./src/db/drizzle.config.ts",
     "migrate:dev": "drizzle-kit push --config=./src/db/drizzle.config.ts",
-    "dev": "bun run migrate:dev && bun run dev:server",
+    "dev": "bun run --watch src/index.ts",
     "migrate:test": "drizzle-kit push --config=./src/db/drizzle-test.config.ts",
     "test": "vitest"
   },
   "dependencies": {
     "@booking/common": "workspace:*",
     "@hono/zod-validator": "^0.7.5",
+    "@nats-io/jetstream": "^3.3.0",
+    "@nats-io/nats-core": "^3.3.0",
+    "@nats-io/transport-node": "^3.3.0",
     "drizzle-orm": "^0.45.1",
     "hono": "^4.11.1",
     "pg": "^8.16.3",
