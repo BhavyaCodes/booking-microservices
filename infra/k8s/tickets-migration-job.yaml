@@ -3,6 +3,7 @@ kind: Job
 metadata:
   name: tickets-migration
 spec:
+  ttlSecondsAfterFinished: 0
   backoffLimit: 3
   template:
     spec:

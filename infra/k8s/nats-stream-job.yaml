@@ -3,6 +3,7 @@ kind: Job
 metadata:
   name: nats-stream-setup
 spec:
+  ttlSecondsAfterFinished: 0
   backoffLimit: 5
   template:
     metadata:
