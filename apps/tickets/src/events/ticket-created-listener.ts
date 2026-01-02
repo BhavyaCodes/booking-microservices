@@ -1,5 +1,5 @@
 import { BaseListener, Subjects, TicketCreatedEvent } from "@booking/common";
-import { JsMsg } from "nats";
+import { JsMsg } from "@nats-io/jetstream/lib/jsmsg";
 
 export class TicketCreatedListener extends BaseListener<TicketCreatedEvent> {
   readonly subject = Subjects.TicketsCreated;

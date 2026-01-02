@@ -3,7 +3,7 @@ import { db, TicketsTxn } from "../db";
 import { outboxTable } from "../db/schema";
 import { NATSEvent } from "@booking/common";
 import { natsWrapper } from "../nats-wrapper";
-import { PubAck } from "nats";
+import { PubAck } from "@nats-io/jetstream/lib/types";
 
 export const outboxPublisher = async () => {
   await db.transaction(async (tx) => {
@@ -25,9 +25,9 @@ export const outboxPublisher = async () => {
           try {
             const pa = await natsWrapper.js.publish(
               event.subject,
-              natsWrapper.sc.encode(JSON.stringify(event.data)),
+              JSON.stringify(event.data),
+              { msgID: event.id },
             );
-
             resolve({ docId: event.id, pa });
           } catch (error) {
             console.error("🚀 ~ outboxPublisher ~ event,error:", event, error);

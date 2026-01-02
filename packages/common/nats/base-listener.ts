@@ -1,5 +1,5 @@
+import type { JetStreamClient, JsMsg } from "@nats-io/jetstream";
 import { Subjects } from "./subjects";
-import type { JetStreamClient, JsMsg } from "nats";
 
 interface Event {
   subject: Subjects;

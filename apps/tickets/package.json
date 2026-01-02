@@ -15,9 +15,11 @@
   "dependencies": {
     "@booking/common": "workspace:*",
     "@hono/zod-validator": "^0.7.5",
+    "@nats-io/jetstream": "^3.3.0",
+    "@nats-io/nats-core": "^3.3.0",
+    "@nats-io/transport-node": "^3.3.0",
     "drizzle-orm": "^0.45.1",
     "hono": "^4.11.1",
-    "nats": "^2.29.3",
     "pg": "^8.16.3",
     "zod": "^4.2.1"
   },

@@ -1,10 +1,10 @@
-import { connect, JetStreamClient, NatsConnection, StringCodec } from "nats";
+import { jetstream, JetStreamClient } from "@nats-io/jetstream";
+import { NatsConnection } from "@nats-io/nats-core/lib/core";
+import { connect } from "@nats-io/transport-node";
 
 class NatsWrapper {
   private _nc?: NatsConnection;
   private _js?: JetStreamClient;
-
-  readonly sc = StringCodec();
 
   get nc() {
     if (!this._nc) {
@@ -26,7 +26,7 @@ class NatsWrapper {
     name = process.env.POD_NAME || "default-nats-client-tickets",
   ) {
     this._nc = await connect({ servers: server, name: name });
-    this._js = this._nc.jetstream();
+    this._js = jetstream(this._nc);
   }
 }
 
