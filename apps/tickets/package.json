@@ -10,6 +10,7 @@
     "migrate:dev": "drizzle-kit push --config=./src/db/drizzle.config.ts",
     "dev": "bun run --watch src/index.ts",
     "migrate:test": "drizzle-kit push --config=./src/db/drizzle-test.config.ts",
+    "drizzle-kit:migrate-test": "drizzle-kit migrate --config=./src/db/drizzle-test.config.ts",
     "test": "vitest"
   },
   "dependencies": {
