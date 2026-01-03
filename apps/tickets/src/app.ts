@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { logger } from "hono/logger";
+
 import { extractCurrentUser, requireAdmin } from "@booking/common/middlewares";
 import { HTTPException } from "hono/http-exception";
 import { CurrentUser } from "@booking/common/interfaces";
@@ -10,6 +10,8 @@ import { eventsTable, seatCategoriesTable, ticketsTable } from "./db/schema";
 import { count } from "drizzle-orm";
 import { Subjects, TicketCreatedEvent } from "@booking/common";
 import { addEventToOutBox } from "./outbox";
+import { logger } from "hono/logger";
+import { pl } from "./logger";
 
 const app = new Hono<{
   Variables: {
@@ -37,7 +39,6 @@ const app = new Hono<{
     ),
     async (c) => {
       const { title, desc, date, imageUrl } = c.req.valid("json");
-
       const newEvent = await db
         .insert(eventsTable)
         .values({
@@ -189,7 +190,7 @@ const app = new Hono<{
           return newSeatCategory[0];
         } catch (error) {
           // tx.rollback(); // Explicit rollback is not needed; Drizzle ORM handles it automatically
-          console.error("Error creating seat category and tickets:", error);
+          pl.error(error, "Error creating seat category and tickets");
           throw new HTTPException(500, {
             res: new Response(
               JSON.stringify({
@@ -223,7 +224,7 @@ const app = new Hono<{
     if (error instanceof HTTPException) {
       return error.getResponse();
     } else {
-      console.error("Unhandled error:", error);
+      pl.error(error, "Unhandled error occurred");
       throw new HTTPException(500, {
         res: new Response(
           JSON.stringify({

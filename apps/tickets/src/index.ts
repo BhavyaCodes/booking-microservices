@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import { natsWrapper } from "./nats-wrapper";
 import { TicketCreatedListener } from "./events/ticket-created-listener";
 import { outboxPublisher } from "./outbox";
+import { pl } from "./logger";
 
 const main = async () => {
   if (!process.env.JWT_KEY) {
@@ -20,35 +21,33 @@ const main = async () => {
 
   try {
     await natsWrapper.connect("nats://nats-jetstream-srv:4222");
-    console.log("🚀 ~ connected to NATS JetStream!!");
+    pl.info("🚀 ~ connected to NATS JetStream!!");
 
     natsWrapper.nc.closed().then(async (err) => {
-      console.error("NATS connection closed", err);
-      // await cleanup();
-      // process.exit(1);
+      pl.error(err, "NATS connection closed");
     });
   } catch (error) {
-    console.error("Failed to connect to NATS JetStream", error);
+    pl.error(error, "Failed to connect to NATS JetStream");
     process.exit(1);
   }
 
   new TicketCreatedListener(natsWrapper.js).listen();
 
   await db.execute(sql`SELECT 1`).catch(() => {
-    console.error("Failed to connect to Postgres");
+    pl.fatal("Failed to connect to Postgres");
     process.exit(-1);
   });
-  console.log("🚀 ~ connected to Postgres");
+  pl.info("🚀 ~ connected to Postgres");
 
   // Listen for PostgreSQL notifications
   const notifClient = await pool.connect();
   await notifClient.query("LISTEN outbox_insert");
-  console.log("🚀 ~ listening for outbox_insert notifications");
+  pl.trace("🚀 ~ listening for outbox_insert notifications");
 
   notifClient.on("notification", (msg) => {
     if (msg.channel === "outbox_insert") {
       outboxPublisher().catch((err) => {
-        console.error("Failed to process outbox events", err);
+        pl.error(err, "Failed to process outbox events");
       });
     }
   });
@@ -67,17 +66,17 @@ const main = async () => {
 
   // Graceful shutdown
   process.on("SIGINT", async () => {
-    console.log("SIGINT received");
+    pl.info("SIGINT received");
     await cleanup();
   });
 
   process.on("SIGTERM", async () => {
-    console.log("SIGTERM received");
+    pl.info("SIGTERM received");
     await cleanup();
   });
 };
 
 main().catch((err) => {
-  console.error("Failed to start the application", err);
+  pl.fatal(err, "Failed to start the application");
   process.exit(1);
 });

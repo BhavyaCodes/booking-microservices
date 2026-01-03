@@ -4,6 +4,7 @@ import { outboxTable } from "../db/schema";
 import { NATSEvent } from "@booking/common";
 import { natsWrapper } from "../nats-wrapper";
 import { PubAck } from "@nats-io/jetstream/lib/types";
+import { pl } from "../logger";
 
 export const outboxPublisher = async () => {
   await db
@@ -32,11 +33,7 @@ export const outboxPublisher = async () => {
                 );
                 resolve({ docId: event.id, pa });
               } catch (error) {
-                console.error(
-                  "🚀 ~ outboxPublisher ~ event,error:",
-                  event,
-                  error,
-                );
+                pl.error({ error, event }, "Failed to publish outbox event");
 
                 reject(error);
               }
@@ -63,10 +60,10 @@ export const outboxPublisher = async () => {
             .update(outboxTable)
             .set({ processed: true })
             .where(inArray(outboxTable.id, successfulPublishesOutboxIds));
-          console.log("🚀 ~ processed updated to true count:", result.rowCount);
+          pl.trace("🚀 ~ processed updated to true count:" + result.rowCount);
         }
       } catch (error) {
-        console.error("Error in outboxPublisher transaction:", error);
+        pl.error(error, "Error in outboxPublisher transaction");
       }
     })
     .catch((err) => {
