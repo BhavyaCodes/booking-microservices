@@ -1,9 +1,12 @@
 import { testClient } from "hono/testing";
 import { app as ticketsApp } from "../app";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { UserRoles } from "@booking/common/interfaces";
 import { db } from "../db";
 import { eventsTable } from "../db/schema";
+import * as outbox from "../outbox";
+import { pl } from "../logger";
+import { Subjects } from "@booking/common";
 
 const client = testClient(ticketsApp);
 
@@ -81,42 +84,11 @@ describe("test if admin only route protection is working", () => {
   });
 });
 
-it("should create event in the database", async () => {
-  const title = "test event title";
-  const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+describe("test event creation", () => {
+  it("should create event in the database", async () => {
+    const title = "test event title";
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-  await client.api.tickets.events.$post(
-    {
-      json: {
-        date: new Date(new Date().getTime() + 3600 * 1000),
-
-        desc: "Some event description",
-        title: title,
-        imageUrl: "https://example.com/image.jpg",
-      },
-    },
-    {
-      headers: {
-        Cookie: cookieJwt,
-      },
-    },
-  );
-
-  const count = await db.$count(eventsTable);
-  expect(count).toBe(1);
-  const insertedEvent = await db.query.eventsTable.findFirst({
-    where: (eventsTable, { eq }) => eq(eventsTable.title, title),
-  });
-
-  expect(insertedEvent).toBeDefined();
-});
-
-it("should be able to store multiple events in the database", async () => {
-  const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
-
-  const titles = ["event 1", "event 2", "event 3"];
-
-  for (const title of titles) {
     await client.api.tickets.events.$post(
       {
         json: {
@@ -133,48 +105,80 @@ it("should be able to store multiple events in the database", async () => {
         },
       },
     );
-  }
 
-  const count = await db.$count(eventsTable);
-  expect(count).toBe(3);
-
-  for (const title of titles) {
+    const count = await db.$count(eventsTable);
+    expect(count).toBe(1);
     const insertedEvent = await db.query.eventsTable.findFirst({
       where: (eventsTable, { eq }) => eq(eventsTable.title, title),
     });
+
     expect(insertedEvent).toBeDefined();
-  }
-});
-
-it("event should have draft set to true by default", async () => {
-  const title = "draft test event";
-  const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
-
-  await client.api.tickets.events.$post(
-    {
-      json: {
-        date: new Date(new Date().getTime() + 3600 * 1000),
-
-        desc: "Some event description",
-        title: title,
-        imageUrl: "https://example.com/image.jpg",
-      },
-    },
-    {
-      headers: {
-        Cookie: cookieJwt,
-      },
-    },
-  );
-
-  const insertedEvent = await db.query.eventsTable.findFirst({
-    where: (eventsTable, { eq }) => eq(eventsTable.title, title),
   });
 
-  expect(insertedEvent).toBeDefined();
-  expect(insertedEvent!.draft).toBe(true);
-});
+  it("should be able to store multiple events in the database", async () => {
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
+    const titles = ["event 1", "event 2", "event 3"];
+
+    for (const title of titles) {
+      await client.api.tickets.events.$post(
+        {
+          json: {
+            date: new Date(new Date().getTime() + 3600 * 1000),
+
+            desc: "Some event description",
+            title: title,
+            imageUrl: "https://example.com/image.jpg",
+          },
+        },
+        {
+          headers: {
+            Cookie: cookieJwt,
+          },
+        },
+      );
+    }
+
+    const count = await db.$count(eventsTable);
+    expect(count).toBe(3);
+
+    for (const title of titles) {
+      const insertedEvent = await db.query.eventsTable.findFirst({
+        where: (eventsTable, { eq }) => eq(eventsTable.title, title),
+      });
+      expect(insertedEvent).toBeDefined();
+    }
+  });
+
+  it("event should have draft set to true by default", async () => {
+    const title = "draft test event";
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+    await client.api.tickets.events.$post(
+      {
+        json: {
+          date: new Date(new Date().getTime() + 3600 * 1000),
+
+          desc: "Some event description",
+          title: title,
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    const insertedEvent = await db.query.eventsTable.findFirst({
+      where: (eventsTable, { eq }) => eq(eventsTable.title, title),
+    });
+
+    expect(insertedEvent).toBeDefined();
+    expect(insertedEvent!.draft).toBe(true);
+  });
+});
 describe("add seat categories to event", () => {
   it("Should throw 400 when event id is not a valid uuid", async () => {
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
@@ -368,6 +372,78 @@ describe("add seat categories to event", () => {
 
     // 5 rows * 10 seats per row = 50 tickets
     expect(tickets.length).toBe(50);
+  });
+
+  it("should call addEventToOutBox when seat category is created", async () => {
+    const outboxSpy = vi.spyOn(outbox, "addEventToOutBox");
+
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+    const newEventResponse = await client.api.tickets.events.$post(
+      {
+        json: {
+          date: new Date(new Date().getTime() + 3600 * 1000),
+
+          desc: "Some event description",
+          title: "Event for seat category",
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    const newEvent = await newEventResponse.json();
+
+    const startRow = 1;
+    const endRow = 5;
+    const seatsPerRow = 10;
+    const price = 100;
+
+    const newSeatCategoryResponse = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow,
+          endRow,
+          price,
+          seatsPerRow,
+        },
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    const result = await newSeatCategoryResponse.json();
+    // pl.trace(outboxSpy.mock.calls[0][1], "outboxSpy calls");
+
+    const [txn, event] = outboxSpy.mock.calls[0];
+    expect(event.data).toHaveLength((endRow - startRow + 1) * seatsPerRow);
+    expect(newSeatCategoryResponse.status).toBe(201);
+    expect(outboxSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        subject: expect.stringContaining(Subjects.TicketsCreated),
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            id: expect.any(String),
+            price,
+            seatCategoryId: result.id,
+          }),
+        ]),
+      }),
+    );
+    outboxSpy.mockRestore();
   });
 
   describe("should not be able to add multiple seat categories if rows overlap", () => {
