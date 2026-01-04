@@ -116,7 +116,6 @@ describe("test event creation", () => {
   });
 
   it("should throw 400 when date is in the past", async () => {
-    const title = "test event title";
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
     const response = await client.api.tickets.events.$post(
