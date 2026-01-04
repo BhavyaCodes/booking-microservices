@@ -10,7 +10,11 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { compare } from "bcryptjs";
 import { CurrentUser } from "@booking/common/interfaces";
-import { CustomErrorResponse, ErrorCodes } from "@booking/common";
+import {
+  CustomErrorResponse,
+  ErrorCodes,
+  zodValidationHook,
+} from "@booking/common";
 
 interface GoogleIdTokenPayload {
   iss: string;
@@ -134,6 +138,7 @@ const app = new Hono<{
           .min(1),
         email: z.email("Valid email is required"),
       }),
+      zodValidationHook,
     ),
     async (c) => {
       const email = c.req.valid("json").email;

@@ -4,3 +4,4 @@ export const greet = (name: string): string => {
 
 export * from "./nats/index";
 export * from "./error/CustomErrorResponse";
+export * from "./error/zod-middleware-hook";

@@ -115,6 +115,33 @@ describe("test event creation", () => {
     expect(insertedEvent).toBeDefined();
   });
 
+  it("should throw 400 when date is in the past", async () => {
+    const title = "test event title";
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+    const response = await client.api.tickets.events.$post(
+      {
+        // @ts-expect-error testing invalid input
+        json: {
+          date: new Date(new Date().getTime() - 3600 * 1000),
+
+          // desc: "Some event description",
+          // title: title,
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    console.log(JSON.stringify(await response.json(), null, 2));
+
+    expect(response.status).toBe(400);
+  });
+
   it("should be able to store multiple events in the database", async () => {
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
@@ -226,6 +253,7 @@ describe("add seat categories to event", () => {
         },
       },
     );
+    expect(newEventResponse.status).toBe(201);
 
     const newEvent = await newEventResponse.json();
 

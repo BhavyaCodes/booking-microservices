@@ -1,9 +1,8 @@
-// TODO: add codes
-
 enum ErrorCodes {
   INCORRECT_PASSWORD = "INCORRECT_PASSWORD",
   USER_NOT_FOUND = "USER_NOT_FOUND",
   OAUTH_TOKEN_EXCHANGE_FAILED = "OAUTH_TOKEN_EXCHANGE_FAILED",
+  VALIDATION_FAILED = "VALIDATION_FAILED",
 }
 
 type Code = ErrorCodes | (string & Record<never, never>);
