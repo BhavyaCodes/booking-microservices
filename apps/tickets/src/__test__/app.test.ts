@@ -137,8 +137,6 @@ describe("test event creation", () => {
       },
     );
 
-    console.log(JSON.stringify(await response.json(), null, 2));
-
     expect(response.status).toBe(400);
   });
 
