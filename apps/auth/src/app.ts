@@ -10,6 +10,11 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { compare } from "bcryptjs";
 import { CurrentUser } from "@booking/common/interfaces";
+import {
+  CustomErrorResponse,
+  ErrorCodes,
+  zodValidationHook,
+} from "@booking/common";
 
 interface GoogleIdTokenPayload {
   iss: string;
@@ -55,14 +60,10 @@ const app = new Hono<{
           console.error("Unexpected error:", error);
         }
         throw new HTTPException(500, {
-          res: new Response(
-            JSON.stringify({
-              message: "Google OAuth failed",
-            }),
-            {
-              headers: { "Content-Type": "application/json" },
-            },
-          ),
+          res: new CustomErrorResponse({
+            message: "Failed to exchange code for tokens",
+            code: ErrorCodes.OAUTH_TOKEN_EXCHANGE_FAILED,
+          }),
         });
       });
 
@@ -137,6 +138,7 @@ const app = new Hono<{
           .min(1),
         email: z.email("Valid email is required"),
       }),
+      zodValidationHook,
     ),
     async (c) => {
       const email = c.req.valid("json").email;
@@ -149,14 +151,10 @@ const app = new Hono<{
 
       if (!isMatch) {
         throw new HTTPException(401, {
-          res: new Response(
-            JSON.stringify({
-              message: "Incorrect password",
-            }),
-            {
-              headers: { "Content-Type": "application/json" },
-            },
-          ),
+          res: new CustomErrorResponse({
+            message: "Incorrect password",
+            code: ErrorCodes.INCORRECT_PASSWORD,
+          }),
         });
       }
 
@@ -164,14 +162,10 @@ const app = new Hono<{
 
       if (!user) {
         throw new HTTPException(404, {
-          res: new Response(
-            JSON.stringify({
-              message: "User not found",
-            }),
-            {
-              headers: { "Content-Type": "application/json" },
-            },
-          ),
+          res: new CustomErrorResponse({
+            message: "User not found",
+            code: ErrorCodes.USER_NOT_FOUND,
+          }),
         });
       }
 

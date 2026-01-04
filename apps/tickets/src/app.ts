@@ -8,7 +8,12 @@ import { z } from "zod";
 import { db } from "./db";
 import { eventsTable, seatCategoriesTable, ticketsTable } from "./db/schema";
 import { count } from "drizzle-orm";
-import { Subjects, TicketCreatedEvent } from "@booking/common";
+import {
+  CustomErrorResponse,
+  Subjects,
+  TicketCreatedEvent,
+  zodValidationHook,
+} from "@booking/common";
 import { addEventToOutBox } from "./outbox";
 import { logger } from "hono/logger";
 import { pl } from "./logger";
@@ -36,6 +41,7 @@ const app = new Hono<{
         }),
         imageUrl: z.url().max(500).optional(),
       }),
+      zodValidationHook,
     ),
     async (c) => {
       const { title, desc, date, imageUrl } = c.req.valid("json");
@@ -55,7 +61,7 @@ const app = new Hono<{
   .post(
     "/api/tickets/events/:eventId/seat-categories",
     requireAdmin,
-    zValidator("param", z.object({ eventId: z.uuid() })),
+    zValidator("param", z.object({ eventId: z.uuid() }), zodValidationHook),
     zValidator(
       "json",
       z
@@ -69,6 +75,7 @@ const app = new Hono<{
           path: ["endRow"],
           message: "endRow must be greater than or equal to startRow",
         }),
+      zodValidationHook,
     ),
     async (c) => {
       const { eventId } = c.req.param();
@@ -78,27 +85,17 @@ const app = new Hono<{
 
       if (!event) {
         throw new HTTPException(404, {
-          res: new Response(
-            JSON.stringify({
-              message: "Event not found",
-            }),
-            {
-              headers: { "Content-Type": "application/json" },
-            },
-          ),
+          res: new CustomErrorResponse({
+            message: "Event not found",
+          }),
         });
       }
 
       if (!event.draft) {
         throw new HTTPException(400, {
-          res: new Response(
-            JSON.stringify({
-              message: "Event is not in draft mode",
-            }),
-            {
-              headers: { "Content-Type": "application/json" },
-            },
-          ),
+          res: new CustomErrorResponse({
+            message: "Event is not in draft mode",
+          }),
         });
       }
 
@@ -130,14 +127,10 @@ const app = new Hono<{
 
         if (hasOverlap) {
           throw new HTTPException(400, {
-            res: new Response(
-              JSON.stringify({
-                message: "Seat category rows overlap with existing categories",
-              }),
-              {
-                headers: { "Content-Type": "application/json" },
-              },
-            ),
+            res: new CustomErrorResponse({
+              message:
+                "Seat category rows overlap with existing seat categories",
+            }),
           });
         }
 
@@ -192,14 +185,9 @@ const app = new Hono<{
           // tx.rollback(); // Explicit rollback is not needed; Drizzle ORM handles it automatically
           pl.error(error, "Error creating seat category and tickets");
           throw new HTTPException(500, {
-            res: new Response(
-              JSON.stringify({
-                message: "Failed to create seat category and tickets",
-              }),
-              {
-                headers: { "Content-Type": "application/json" },
-              },
-            ),
+            res: new CustomErrorResponse({
+              message: "Failed to create seat category and tickets",
+            }),
           });
         }
       });
@@ -226,14 +214,9 @@ const app = new Hono<{
     } else {
       pl.error(error, "Unhandled error occurred");
       throw new HTTPException(500, {
-        res: new Response(
-          JSON.stringify({
-            message: "Internal Server Error",
-          }),
-          {
-            headers: { "Content-Type": "application/json" },
-          },
-        ),
+        res: new CustomErrorResponse({
+          message: "Internal Server Error",
+        }),
       });
     }
   });

@@ -2,6 +2,7 @@ import { testClient } from "hono/testing";
 import { app as authApp } from "../app";
 import { describe, it, expect } from "vitest";
 import { User, UserRoles } from "../models/user";
+import { ErrorCodes } from "@booking/common";
 
 const client = testClient(authApp);
 
@@ -134,6 +135,10 @@ describe("create-admin endpoint", () => {
         },
       },
     );
+
+    const responseData = await response.json();
+    // @ts-expect-error error response
+    expect(responseData.code).toBe(ErrorCodes.INCORRECT_PASSWORD);
     expect(response.status).toBe(401);
   });
 
@@ -153,6 +158,9 @@ describe("create-admin endpoint", () => {
         },
       },
     );
+    const responseData = await response.json();
+    // @ts-expect-error error response
+    expect(responseData.code).toBe(ErrorCodes.USER_NOT_FOUND);
     expect(response.status).toBe(404);
   });
 
