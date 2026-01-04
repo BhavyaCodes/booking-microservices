@@ -3,3 +3,4 @@ export const greet = (name: string): string => {
 };
 
 export * from "./nats/index";
+export * from "./error/CustomErrorResponse";
