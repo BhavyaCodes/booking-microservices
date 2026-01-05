@@ -3,6 +3,7 @@ enum ErrorCodes {
   USER_NOT_FOUND = "USER_NOT_FOUND",
   OAUTH_TOKEN_EXCHANGE_FAILED = "OAUTH_TOKEN_EXCHANGE_FAILED",
   VALIDATION_FAILED = "VALIDATION_FAILED",
+  INVALID_SESSION = "INVALID_SESSION",
 }
 
 type Code = ErrorCodes | (string & Record<never, never>);
