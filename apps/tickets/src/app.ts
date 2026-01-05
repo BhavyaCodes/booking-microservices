@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 
 import { extractCurrentUser, requireAdmin } from "@booking/common/middlewares";
-import { HTTPException } from "hono/http-exception";
 import { CurrentUser } from "@booking/common/interfaces";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
@@ -10,6 +9,7 @@ import { eventsTable, seatCategoriesTable, ticketsTable } from "./db/schema";
 import { count } from "drizzle-orm";
 import {
   CustomErrorResponse,
+  HTTPException,
   Subjects,
   TicketCreatedEvent,
   zodValidationHook,
