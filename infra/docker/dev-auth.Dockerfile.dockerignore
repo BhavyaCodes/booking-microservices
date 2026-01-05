@@ -1,6 +1,8 @@
 **/node_modules
-apps/client
-apps/tickets
 **/.git
 infra
 **/*.test.ts
+
+apps/client
+apps/tickets
+apps/orders
