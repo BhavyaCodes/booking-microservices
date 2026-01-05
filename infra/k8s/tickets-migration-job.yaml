@@ -20,21 +20,21 @@ spec:
           image: booking-dev-tickets:latest
           imagePullPolicy: Never
           env:
-            - name: POSTGRES_PASSWORD
+            - name: TICKETS_POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: booking-secrets
-                  key: POSTGRES_PASSWORD
-            - name: POSTGRES_USER
+                  key: TICKETS_POSTGRES_PASSWORD
+            - name: TICKETS_POSTGRES_USER
               valueFrom:
                 secretKeyRef:
                   name: booking-secrets
-                  key: POSTGRES_USER
-            - name: POSTGRES_DB
+                  key: TICKETS_POSTGRES_USER
+            - name: TICKETS_POSTGRES_DB
               valueFrom:
                 secretKeyRef:
                   name: booking-secrets
-                  key: POSTGRES_DB
+                  key: TICKETS_POSTGRES_DB
           command:
             - bun
             - run

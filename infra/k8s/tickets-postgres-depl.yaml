@@ -21,17 +21,17 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: booking-secrets
-                  key: POSTGRES_PASSWORD
+                  key: TICKETS_POSTGRES_PASSWORD
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
                   name: booking-secrets
-                  key: POSTGRES_USER
+                  key: TICKETS_POSTGRES_USER
             - name: POSTGRES_DB
               valueFrom:
                 secretKeyRef:
                   name: booking-secrets
-                  key: POSTGRES_DB
+                  key: TICKETS_POSTGRES_DB
 
 ---
 apiVersion: v1

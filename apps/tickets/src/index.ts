@@ -12,9 +12,9 @@ const main = async () => {
   }
 
   if (
-    !process.env.POSTGRES_USER ||
-    !process.env.POSTGRES_PASSWORD ||
-    !process.env.POSTGRES_DB
+    !process.env.TICKETS_POSTGRES_USER ||
+    !process.env.TICKETS_POSTGRES_PASSWORD ||
+    !process.env.TICKETS_POSTGRES_DB
   ) {
     throw new Error("Postgres environment variables must be set");
   }
@@ -33,8 +33,8 @@ const main = async () => {
 
   new TicketCreatedListener(natsWrapper.js).listen();
 
-  await db.execute(sql`SELECT 1`).catch(() => {
-    pl.fatal("Failed to connect to Postgres");
+  await db.execute(sql`SELECT 1`).catch((err) => {
+    pl.fatal(err, "Failed to connect to Postgres");
     process.exit(-1);
   });
   pl.info("🚀 ~ connected to Postgres");

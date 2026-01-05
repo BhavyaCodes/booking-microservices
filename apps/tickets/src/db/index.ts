@@ -5,7 +5,7 @@ import * as schema from "./schema";
 const connectionString =
   process.env.NODE_ENV === "test"
     ? "postgresql://test:test@localhost:5432/test"
-    : `postgresql://${process.env.POSTGRES_USER}:${process.env.POSTGRES_PASSWORD}@tickets-postgres-srv:5432/${process.env.POSTGRES_DB}`;
+    : `postgresql://${process.env.TICKETS_POSTGRES_USER}:${process.env.TICKETS_POSTGRES_PASSWORD}@tickets-postgres-srv:5432/${process.env.TICKETS_POSTGRES_DB}`;
 
 export const pool = new Pool({
   connectionString,
