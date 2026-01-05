@@ -8,3 +8,5 @@ export * from "./error/zod-middleware-hook";
 
 // Re-export HTTPException so all apps use the same instance
 export { HTTPException } from "hono/http-exception";
+
+export * from "./logger/pino";
