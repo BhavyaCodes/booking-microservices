@@ -3,6 +3,7 @@
 infra
 **/*.test.ts
 
+
 apps/client
+apps/auth
 apps/tickets
-apps/orders

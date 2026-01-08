@@ -2,8 +2,8 @@ import { db, pool } from "./db";
 import { app } from "./app";
 import { sql } from "drizzle-orm";
 import { natsWrapper } from "./nats-wrapper";
-import { TicketCreatedListener } from "./events/ticket-created-listener";
-import { outboxPublisher } from "./outbox";
+// import { TicketCreatedListener } from "./events/ticket-created-listener";
+// import { outboxPublisher } from "./outbox";
 import { pl } from "./logger";
 
 const main = async () => {
@@ -12,9 +12,9 @@ const main = async () => {
   }
 
   if (
-    !process.env.TICKETS_POSTGRES_USER ||
-    !process.env.TICKETS_POSTGRES_PASSWORD ||
-    !process.env.TICKETS_POSTGRES_DB
+    !process.env.ORDERS_POSTGRES_USER ||
+    !process.env.ORDERS_POSTGRES_PASSWORD ||
+    !process.env.ORDERS_POSTGRES_DB
   ) {
     throw new Error("Postgres environment variables must be set");
   }
@@ -31,10 +31,10 @@ const main = async () => {
     process.exit(1);
   }
 
-  new TicketCreatedListener(natsWrapper.js).listen();
+  // new TicketCreatedListener(natsWrapper.js).listen();
 
-  await db.execute(sql`SELECT 1`).catch((err) => {
-    pl.fatal(err, "Failed to connect to Postgres");
+  await db.execute(sql`SELECT 1`).catch(() => {
+    pl.fatal("Failed to connect to Postgres");
     process.exit(-1);
   });
   pl.info("🚀 ~ connected to Postgres");
@@ -44,13 +44,13 @@ const main = async () => {
   await notifClient.query("LISTEN outbox_insert");
   pl.trace("🚀 ~ listening for outbox_insert notifications");
 
-  notifClient.on("notification", (msg) => {
-    if (msg.channel === "outbox_insert") {
-      outboxPublisher().catch((err) => {
-        pl.error(err, "Failed to process outbox events");
-      });
-    }
-  });
+  // notifClient.on("notification", (msg) => {
+  //   if (msg.channel === "outbox_insert") {
+  //     outboxPublisher().catch((err) => {
+  //       pl.error(err, "Failed to process outbox events");
+  //     });
+  //   }
+  // });
 
   const cleanup = async () => {
     await notifClient.query("UNLISTEN outbox_insert");

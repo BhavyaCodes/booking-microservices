@@ -1,34 +1,34 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: tickets-depl
+  name: orders-depl
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: tickets
+      app: orders
   template:
     metadata:
       labels:
-        app: tickets
+        app: orders
     spec:
-      serviceAccountName: tickets
+      serviceAccountName: orders
       initContainers:
         - name: wait-for-postgres
           image: busybox:latest
           command:
             - sh
             - -c
-            - until nc -z tickets-postgres-srv 5432; do echo waiting for postgres; sleep 2; done
+            - until nc -z orders-postgres-srv 5432; do echo waiting for postgres; sleep 2; done
         - name: wait-for-migration-job
           image: bitnami/kubectl:latest
           command:
             - sh
             - -c
-            - kubectl wait --for=condition=complete job/tickets-migration --timeout=300s
+            - kubectl wait --for=condition=complete job/orders-migration --timeout=300s
       containers:
-        - name: tickets
-          image: booking-dev-tickets:latest
+        - name: orders
+          image: booking-dev-orders:latest
           imagePullPolicy: Never
           env:
             - name: JWT_KEY
@@ -36,21 +36,21 @@ spec:
                 secretKeyRef:
                   name: booking-secrets
                   key: JWT_KEY
-            - name: TICKETS_POSTGRES_PASSWORD
+            - name: ORDERS_POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: booking-secrets
-                  key: TICKETS_POSTGRES_PASSWORD
-            - name: TICKETS_POSTGRES_USER
+                  key: ORDERS_POSTGRES_PASSWORD
+            - name: ORDERS_POSTGRES_USER
               valueFrom:
                 secretKeyRef:
                   name: booking-secrets
-                  key: TICKETS_POSTGRES_USER
-            - name: TICKETS_POSTGRES_DB
+                  key: ORDERS_POSTGRES_USER
+            - name: ORDERS_POSTGRES_DB
               valueFrom:
                 secretKeyRef:
                   name: booking-secrets
-                  key: TICKETS_POSTGRES_DB
+                  key: ORDERS_POSTGRES_DB
             - name: POD_NAME
               valueFrom:
                 fieldRef:
@@ -59,12 +59,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: tickets-srv
+  name: orders-srv
 spec:
   selector:
-    app: tickets
+    app: orders
   ports:
-    - name: tickets
+    - name: orders
       protocol: TCP
       port: 3000
       targetPort: 3000
@@ -73,13 +73,13 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: tickets
+  name: orders
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: tickets-migration-waiter
+  name: orders-migration-waiter
 rules:
   - apiGroups:
       - batch
@@ -94,12 +94,12 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: tickets-migration-waiter
+  name: orders-migration-waiter
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: tickets-migration-waiter
+  name: orders-migration-waiter
 subjects:
   - kind: ServiceAccount
-    name: tickets
+    name: orders
     namespace: default

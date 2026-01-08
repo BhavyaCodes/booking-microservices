@@ -5,7 +5,7 @@ import * as schema from "./schema";
 const connectionString =
   process.env.NODE_ENV === "test"
     ? "postgresql://test:test@localhost:5432/test"
-    : `postgresql://${process.env.TICKETS_POSTGRES_USER}:${process.env.TICKETS_POSTGRES_PASSWORD}@tickets-postgres-srv:5432/${process.env.TICKETS_POSTGRES_DB}`;
+    : `postgresql://${process.env.ORDERS_POSTGRES_USER}:${process.env.ORDERS_POSTGRES_PASSWORD}@orders-postgres-srv:5432/${process.env.ORDERS_POSTGRES_DB}`;
 
 export const pool = new Pool({
   connectionString,
@@ -18,4 +18,4 @@ export const db: NodePgDatabase<typeof schema> = drizzle(pool, {
   schema,
 });
 
-export type TicketsTxn = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export type OrdersTxn = Parameters<Parameters<typeof db.transaction>[0]>[0];

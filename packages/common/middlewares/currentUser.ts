@@ -1,7 +1,6 @@
 import type { Context, Next } from "hono";
 import { getCookie } from "hono/cookie";
 import { verify } from "hono/jwt";
-import { HTTPException } from "hono/http-exception";
 import type { UserRoles } from "../interfaces";
 
 export const extractCurrentUser = async (c: Context, next: Next) => {
@@ -17,17 +16,9 @@ export const extractCurrentUser = async (c: Context, next: Next) => {
       role: payload.role as UserRoles,
     });
   } catch (err) {
-    throw new HTTPException(401, {
-      res: new Response(
-        JSON.stringify({
-          message: "Invalid session",
-        }),
-        {
-          status: 401,
-          headers: { "Content-Type": "application/json" },
-        },
-      ),
-    });
+    console.error("JWT verification failed:", err);
+    // Don't throw here - just don't set currentUser
+    // The requireAuth middleware will handle the 401 response
   }
-  await next();
+  return await next();
 };

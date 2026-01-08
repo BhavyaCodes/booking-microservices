@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: tickets-migration
+  name: orders-migration
 spec:
   ttlSecondsAfterFinished: 30
   backoffLimit: 3
@@ -14,27 +14,27 @@ spec:
           command:
             - sh
             - -c
-            - until nc -z tickets-postgres-srv 5432; do echo waiting for postgres; sleep 2; done
+            - until nc -z orders-postgres-srv 5432; do echo waiting for postgres; sleep 2; done
       containers:
-        - name: migrate-db-tickets
-          image: booking-dev-tickets:latest
+        - name: migrate-db-orders
+          image: booking-dev-orders:latest
           imagePullPolicy: Never
           env:
-            - name: TICKETS_POSTGRES_PASSWORD
+            - name: ORDERS_POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: booking-secrets
-                  key: TICKETS_POSTGRES_PASSWORD
-            - name: TICKETS_POSTGRES_USER
+                  key: ORDERS_POSTGRES_PASSWORD
+            - name: ORDERS_POSTGRES_USER
               valueFrom:
                 secretKeyRef:
                   name: booking-secrets
-                  key: TICKETS_POSTGRES_USER
-            - name: TICKETS_POSTGRES_DB
+                  key: ORDERS_POSTGRES_USER
+            - name: ORDERS_POSTGRES_DB
               valueFrom:
                 secretKeyRef:
                   name: booking-secrets
-                  key: TICKETS_POSTGRES_DB
+                  key: ORDERS_POSTGRES_DB
           command:
             - bun
             - run

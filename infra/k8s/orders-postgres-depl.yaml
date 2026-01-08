@@ -1,19 +1,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: tickets-postgres-depl
+  name: orders-postgres-depl
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: tickets-postgres
+      app: orders-postgres
   template:
     metadata:
       labels:
-        app: tickets-postgres
+        app: orders-postgres
     spec:
       containers:
-        - name: tickets-postgres
+        - name: orders-postgres
           image: postgres
           imagePullPolicy: IfNotPresent
           env:
@@ -21,27 +21,27 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: booking-secrets
-                  key: TICKETS_POSTGRES_PASSWORD
+                  key: ORDERS_POSTGRES_PASSWORD
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
                   name: booking-secrets
-                  key: TICKETS_POSTGRES_USER
+                  key: ORDERS_POSTGRES_USER
             - name: POSTGRES_DB
               valueFrom:
                 secretKeyRef:
                   name: booking-secrets
-                  key: TICKETS_POSTGRES_DB
+                  key: ORDERS_POSTGRES_DB
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: tickets-postgres-srv
+  name: orders-postgres-srv
 spec:
   type: ClusterIP
   selector:
-    app: tickets-postgres
+    app: orders-postgres
   ports:
     - name: db
       protocol: TCP

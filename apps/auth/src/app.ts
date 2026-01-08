@@ -4,7 +4,6 @@ import axios, { AxiosError } from "axios";
 import { decode, sign } from "hono/jwt";
 import { User, UserRoles } from "./models/user";
 import { deleteCookie, setCookie } from "hono/cookie";
-import { HTTPException } from "hono/http-exception";
 import { extractCurrentUser, requireAuth } from "@booking/common/middlewares";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
@@ -13,6 +12,7 @@ import { CurrentUser } from "@booking/common/interfaces";
 import {
   CustomErrorResponse,
   ErrorCodes,
+  HTTPException,
   zodValidationHook,
 } from "@booking/common";
 
@@ -180,16 +180,7 @@ const app = new Hono<{
       return error.getResponse();
     } else {
       console.error("Unhandled error:", error);
-      throw new HTTPException(500, {
-        res: new Response(
-          JSON.stringify({
-            message: "Internal Server Error",
-          }),
-          {
-            headers: { "Content-Type": "application/json" },
-          },
-        ),
-      });
+      return c.json({ message: "Internal Server Error" }, 500);
     }
   });
 
