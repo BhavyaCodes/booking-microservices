@@ -15,6 +15,13 @@
       "when": 1767125171398,
       "tag": "0001_outbox-notify",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1767902285576,
+      "tag": "0002_productive_tusk",
+      "breakpoints": true
     }
   ]
 }
