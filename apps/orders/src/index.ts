@@ -33,8 +33,8 @@ const main = async () => {
 
   // new TicketCreatedListener(natsWrapper.js).listen();
 
-  await db.execute(sql`SELECT 1`).catch(() => {
-    pl.fatal("Failed to connect to Postgres");
+  await db.execute(sql`SELECT 1`).catch((error) => {
+    pl.fatal(error, "Failed to connect to Postgres");
     process.exit(-1);
   });
   pl.info("🚀 ~ connected to Postgres");
