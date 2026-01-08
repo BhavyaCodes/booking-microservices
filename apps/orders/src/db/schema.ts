@@ -1,14 +1,6 @@
-import {
-  pgTable,
-  boolean,
-  integer,
-  unique,
-  uuid,
-  jsonb,
-  pgEnum,
-} from "drizzle-orm/pg-core";
+import { pgTable, integer, uuid, timestamp } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import { NATSEvent, Subjects } from "@booking/common";
+// import { NATSEvent, Subjects } from "@booking/common";
 
 export const ticketsTable = pgTable(
   "tickets",
@@ -18,6 +10,8 @@ export const ticketsTable = pgTable(
       .default(sql`uuidv7()`),
     seatCategoryId: uuid().notNull(),
     userId: uuid(),
+    price: integer().notNull(),
+    date: timestamp().notNull(),
   },
   // (table) => [
   //   unique("tickets_seat_unique").on(
