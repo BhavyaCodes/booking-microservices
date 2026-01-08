@@ -463,6 +463,7 @@ describe("add seat categories to event", () => {
             id: expect.any(String),
             price,
             seatCategoryId: result.id,
+            date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/), // ISO date format
           }),
         ]),
       }),
