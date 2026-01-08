@@ -23,7 +23,7 @@ class NatsWrapper {
   // name - identifier for this NATS client (also used as the initial stream name, e.g. "tickets-publisher"
   async connect(
     server: string,
-    name = process.env.POD_NAME || "default-nats-client-tickets",
+    name = process.env.POD_NAME || "default-nats-client-orders",
   ) {
     this._nc = await connect({ servers: server, name: name });
     this._js = jetstream(this._nc);
