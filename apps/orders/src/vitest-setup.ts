@@ -4,7 +4,7 @@ import { sign } from "hono/jwt";
 import { randomUUID } from "crypto";
 import { UserRoles } from "@booking/common/interfaces";
 import { db } from "./db";
-import { outboxTable, ticketsTable } from "./db/schema";
+import { ticketsTable } from "./db/schema";
 
 declare global {
   var signin: (options?: { id?: string; role?: UserRoles }) => Promise<string>;
@@ -16,7 +16,6 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await db.delete(ticketsTable);
-  await db.delete(outboxTable);
 });
 
 global.signin = async (options) => {
