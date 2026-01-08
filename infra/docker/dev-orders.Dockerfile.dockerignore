@@ -1,0 +1,9 @@
+**/node_modules
+**/.git
+infra
+**/*.test.ts
+
+
+apps/client
+apps/auth
+apps/tickets

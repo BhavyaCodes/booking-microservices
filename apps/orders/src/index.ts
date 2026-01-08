@@ -12,9 +12,9 @@ const main = async () => {
   }
 
   if (
-    !process.env.POSTGRES_USER ||
-    !process.env.POSTGRES_PASSWORD ||
-    !process.env.POSTGRES_DB
+    !process.env.ORDERS_POSTGRES_USER ||
+    !process.env.ORDERS_POSTGRES_PASSWORD ||
+    !process.env.ORDERS_POSTGRES_DB
   ) {
     throw new Error("Postgres environment variables must be set");
   }

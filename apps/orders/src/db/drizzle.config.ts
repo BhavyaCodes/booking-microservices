@@ -5,7 +5,7 @@ export default defineConfig({
   schema: "./src/db/schema.ts",
   dialect: "postgresql",
   dbCredentials: {
-    url: `postgresql://${process.env.POSTGRES_USER}:${process.env.POSTGRES_PASSWORD}@tickets-postgres-srv:5432/${process.env.POSTGRES_DB}`,
+    url: `postgresql://${process.env.ORDERS_POSTGRES_USER}:${process.env.ORDERS_POSTGRES_PASSWORD}@orders-postgres-srv:5432/${process.env.ORDERS_POSTGRES_DB}`,
   },
   casing: "snake_case",
 });

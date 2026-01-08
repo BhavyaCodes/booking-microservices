@@ -5,7 +5,6 @@ import { UserRoles } from "@booking/common/interfaces";
 import { db } from "../db";
 import { eventsTable } from "../db/schema";
 import * as outbox from "../outbox";
-import { pl } from "../logger";
 import { Subjects } from "@booking/common";
 
 const client = testClient(ticketsApp);

@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-depl
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: orders
+  template:
+    metadata:
+      labels:
+        app: orders
+    spec:
+      serviceAccountName: orders
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:latest
+          command:
+            - sh
+            - -c
+            - until nc -z orders-postgres-srv 5432; do echo waiting for postgres; sleep 2; done
+        - name: wait-for-migration-job
+          image: bitnami/kubectl:latest
+          command:
+            - sh
+            - -c
+            - kubectl wait --for=condition=complete job/orders-migration --timeout=300s
+      containers:
+        - name: orders
+          image: booking-dev-orders:latest
+          imagePullPolicy: Never
+          env:
+            - name: JWT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: booking-secrets
+                  key: JWT_KEY
+            - name: ORDERS_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: booking-secrets
+                  key: ORDERS_POSTGRES_PASSWORD
+            - name: ORDERS_POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: booking-secrets
+                  key: ORDERS_POSTGRES_USER
+            - name: ORDERS_POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: booking-secrets
+                  key: ORDERS_POSTGRES_DB
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orders-srv
+spec:
+  selector:
+    app: orders
+  ports:
+    - name: orders
+      protocol: TCP
+      port: 3000
+      targetPort: 3000
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: orders
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: orders-migration-waiter
+rules:
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+    verbs:
+      - get
+      - list
+      - watch
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: orders-migration-waiter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: orders-migration-waiter
+subjects:
+  - kind: ServiceAccount
+    name: orders
+    namespace: default

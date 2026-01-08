@@ -18,13 +18,21 @@ build:
             dest: /app
       docker:
         dockerfile: infra/docker/dev-tickets.Dockerfile
+    - image: booking-dev-orders
+      context: .
+      sync:
+        manual:
+          - src: apps/orders/src/**/*.ts
+            dest: /app
+      docker:
+        dockerfile: infra/docker/dev-orders.Dockerfile
     - image: booking-dev-client
       context: .
       docker:
         dockerfile: infra/docker/dev-client.Dockerfile
       sync:
         manual:
-          - src: "apps/{client,auth,tickets}/src/**/*.{js,ts,tsx}"
+          - src: "apps/{client,auth,tickets,orders}/src/**/*.{js,ts,tsx}"
             dest: /app
 
   local:

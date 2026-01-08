@@ -17,28 +17,27 @@ export const ticketsTable = pgTable(
       .primaryKey()
       .default(sql`uuidv7()`),
     seatCategoryId: uuid().notNull(),
-    row: integer().notNull(),
-    seatNumber: integer().notNull(),
+    userId: uuid(),
   },
-  (table) => [
-    unique("tickets_seat_unique").on(
-      table.seatCategoryId,
-      table.row,
-      table.seatNumber,
-    ),
-  ],
+  // (table) => [
+  //   unique("tickets_seat_unique").on(
+  //     table.seatCategoryId,
+  //     table.row,
+  //     table.seatNumber,
+  //   ),
+  // ],
 );
 
-export const subjectEnum = pgEnum(
-  "nats_subjects",
-  Object.values(Subjects) as [string, ...string[]],
-);
+// export const subjectEnum = pgEnum(
+//   "nats_subjects",
+//   Object.values(Subjects) as [string, ...string[]],
+// );
 
-export const outboxTable = pgTable("outbox", {
-  id: uuid()
-    .primaryKey()
-    .default(sql`uuidv7()`),
-  subject: subjectEnum().notNull().$type<NATSEvent["subject"]>(),
-  data: jsonb().notNull().$type<NATSEvent["data"]>(),
-  processed: boolean().notNull().default(false),
-});
+// export const outboxTable = pgTable("outbox", {
+//   id: uuid()
+//     .primaryKey()
+//     .default(sql`uuidv7()`),
+//   subject: subjectEnum().notNull().$type<NATSEvent["subject"]>(),
+//   data: jsonb().notNull().$type<NATSEvent["data"]>(),
+//   processed: boolean().notNull().default(false),
+// });
