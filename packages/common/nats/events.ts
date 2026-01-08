@@ -1,3 +1,4 @@
+import type { DateISOString } from "../interfaces";
 import { Subjects } from "./subjects";
 
 export type TicketCreatedEvent = {
@@ -6,6 +7,7 @@ export type TicketCreatedEvent = {
     id: string;
     price: number;
     seatCategoryId: string;
+    date: DateISOString;
   }[];
 };
 

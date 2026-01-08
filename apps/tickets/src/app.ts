@@ -172,6 +172,7 @@ const app = new Hono<{
               id: ticket.id,
               price: price,
               seatCategoryId: ticket.seatCategoryId,
+              date: event.date.toISOString(),
             }),
           );
 
