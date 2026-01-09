@@ -5,6 +5,7 @@ import { pl } from "../logger";
 export class TicketCreatedListener extends BaseListener<TicketCreatedEvent> {
   readonly subject = Subjects.TicketsCreated;
   readonly stream = "booking";
+  readonly durableName = "tickets-service-durable";
 
   onMessage(msg: JsMsg) {
     pl.trace(

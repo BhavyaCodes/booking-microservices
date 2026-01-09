@@ -10,7 +10,7 @@ export abstract class BaseListener<T extends Event> {
   abstract subject: T["subject"];
   abstract onMessage(msg: JsMsg): void;
   abstract stream: string;
-
+  abstract durableName: string;
   protected js: JetStreamClient;
 
   constructor(js: JetStreamClient) {
@@ -18,10 +18,7 @@ export abstract class BaseListener<T extends Event> {
   }
 
   async listen() {
-    const consumer = await this.js.consumers.get(
-      this.stream,
-      "tickets-service-durable",
-    );
+    const consumer = await this.js.consumers.get(this.stream, this.durableName);
     consumer.consume({
       callback: (msg: JsMsg) => {
         this.onMessage(msg);

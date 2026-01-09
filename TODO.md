@@ -4,7 +4,7 @@
 - [x] add userId to tickets service (schema)
 - [ ] listen to tickets.created event on orders srv
   - [x] update infra to add new consumer for orders srv
-  - [ ] update base-listener to allow different consumer orders-service-durable
+  - [x] update base-listener to allow different consumer orders-service-durable
   - [ ] listen on orders srv
   - [ ] replicate tickets in orders service
 
