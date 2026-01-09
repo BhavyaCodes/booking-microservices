@@ -5,8 +5,9 @@
 - [ ] listen to tickets.created event on orders srv
   - [x] update infra to add new consumer for orders srv
   - [x] update base-listener to allow different consumer orders-service-durable
-  - [ ] listen on orders srv
-  - [ ] replicate tickets in orders service
+  - [x] listen on orders srv
+  - [x] replicate tickets in orders service
+  - [ ] setup tests for listener
 
 ## Later
 
