@@ -19,6 +19,11 @@ export abstract class BaseListener<T extends Event> {
 
   async listen() {
     const consumer = await this.js.consumers.get(this.stream, this.durableName);
+    console.info(
+      { podName: process.env.POD_NAME, subject: this.subject },
+      "Listening for events",
+    );
+
     consumer.consume({
       callback: (msg: JsMsg) => {
         this.onMessage(msg);

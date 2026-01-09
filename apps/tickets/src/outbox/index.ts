@@ -7,6 +7,7 @@ import { PubAck } from "@nats-io/jetstream/lib/types";
 import { pl } from "../logger";
 
 export const outboxPublisher = async () => {
+  pl.trace("🚀 ~ outboxPublisher called");
   await db
     .transaction(async (tx) => {
       try {
@@ -31,6 +32,7 @@ export const outboxPublisher = async () => {
                   JSON.stringify(event.data),
                   { msgID: event.id },
                 );
+                pl.trace({ event, pa }, "Published outbox event to NATS");
                 resolve({ docId: event.id, pa });
               } catch (error) {
                 pl.error({ error, event }, "Failed to publish outbox event");
