@@ -7,7 +7,7 @@
   - [x] update base-listener to allow different consumer orders-service-durable
   - [x] listen on orders srv
   - [x] replicate tickets in orders service
-  - [ ] setup tests for listener
+  - [x] setup tests for listener
 
 ## Later
 

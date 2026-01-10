@@ -4,7 +4,6 @@ import { TicketCreatedListener } from "../ticket-created-listener";
 import { natsWrapper as realNatsWrapper } from "../../nats-wrapper";
 import { db } from "../../db";
 import { ticketsTable } from "../../db/schema";
-import { pl } from "../../logger";
 import { v7 as uuidv7 } from "uuid";
 import { eq } from "drizzle-orm";
 
@@ -17,11 +16,6 @@ const flushAsync = () => new Promise((resolve) => setTimeout(resolve, 100));
 describe("ticket-created-listener test", () => {
   beforeEach(() => {
     natsWrapper.__reset();
-  });
-
-  it("should do something", () => {
-    // test implementation goes here
-    expect(true).toBe(true);
   });
 
   it("should be able to create instances of TicketCreatedListener", () => {
@@ -53,12 +47,7 @@ describe("ticket-created-listener test", () => {
     await natsWrapper.__triggerMessage(msg);
     await flushAsync();
 
-    // wait for the DB insert to complete
-    // await new Promise((resolve) => setTimeout(resolve, 1000));
-
     const rows = await db.select().from(ticketsTable);
-    // pl.debug({ rows }, "Tickets in DB after TicketCreatedEvent");
-    console.debug({ rows }, "Tickets in DB after TicketCreatedEvent");
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe(payload[0].id);
     expect(rows[0].seatCategoryId).toBe(payload[0].seatCategoryId);
