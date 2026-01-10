@@ -2,3 +2,7 @@
 **/.git
 infra
 **/*.test.ts
+.github
+TODO.md
+secrets.md
+dev.env
