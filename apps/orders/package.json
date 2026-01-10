@@ -4,7 +4,7 @@
     "drizzle-kit:generate-dev": "drizzle-kit generate --config=./src/db/drizzle.config.ts",
     "drizzle-kit:migrate-dev": "drizzle-kit migrate --config=./src/db/drizzle.config.ts",
     "drizzle-kit:migrate-test": "drizzle-kit migrate --config=./src/db/drizzle-test.config.ts",
-    "dev": "bun run --hot src/index.ts",
+    "dev": "bun run --watch src/index.ts",
     "test": "vitest"
   },
   "dependencies": {
@@ -24,6 +24,7 @@
     "@types/bun": "latest",
     "@types/pg": "^8.16.0",
     "drizzle-kit": "^0.31.8",
+    "uuid": "^13.0.0",
     "vitest": "^4.0.16"
   }
 }

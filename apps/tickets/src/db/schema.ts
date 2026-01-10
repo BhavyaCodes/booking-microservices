@@ -47,6 +47,7 @@ export const ticketsTable = pgTable(
       .references(() => seatCategoriesTable.id, { onDelete: "cascade" }),
     row: integer().notNull(),
     seatNumber: integer().notNull(),
+    userId: uuid(),
   },
   (table) => [
     unique("tickets_seat_unique").on(

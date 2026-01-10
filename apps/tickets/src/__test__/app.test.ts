@@ -342,62 +342,195 @@ describe("add seat categories to event", () => {
     expect(newSeatCategoryResponse.status).toBe(400);
   });
 
-  it("should add tickets when seat category is created", async () => {
-    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+  describe("tickets creation upon seat category addition", () => {
+    it("should add tickets when seat category is created", async () => {
+      const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-    const newEventResponse = await client.api.tickets.events.$post(
-      {
-        json: {
-          date: new Date(new Date().getTime() + 3600 * 1000),
+      const newEventResponse = await client.api.tickets.events.$post(
+        {
+          json: {
+            date: new Date(new Date().getTime() + 3600 * 1000),
 
-          desc: "Some event description",
-          title: "Event for seat category",
-          imageUrl: "https://example.com/image.jpg",
+            desc: "Some event description",
+            title: "Event for seat category",
+            imageUrl: "https://example.com/image.jpg",
+          },
         },
-      },
-      {
-        headers: {
-          Cookie: cookieJwt,
+        {
+          headers: {
+            Cookie: cookieJwt,
+          },
         },
-      },
-    );
+      );
 
-    const newEvent = await newEventResponse.json();
+      const newEvent = await newEventResponse.json();
 
-    const newSeatCategoryResponse = await client.api.tickets.events[":eventId"][
-      "seat-categories"
-    ].$post(
-      {
-        json: {
-          startRow: 1,
-          endRow: 5,
-          price: 100,
-          seatsPerRow: 10,
+      const newSeatCategoryResponse = await client.api.tickets.events[
+        ":eventId"
+      ]["seat-categories"].$post(
+        {
+          json: {
+            startRow: 1,
+            endRow: 5,
+            price: 100,
+            seatsPerRow: 10,
+          },
+          param: {
+            eventId: newEvent.id,
+          },
         },
-        param: {
-          eventId: newEvent.id,
+        {
+          headers: {
+            Cookie: cookieJwt,
+          },
         },
-      },
-      {
-        headers: {
-          Cookie: cookieJwt,
-        },
-      },
-    );
+      );
 
-    expect(newSeatCategoryResponse.status).toBe(201);
+      expect(newSeatCategoryResponse.status).toBe(201);
 
-    const newSeatCategory = await newSeatCategoryResponse.json();
+      const newSeatCategory = await newSeatCategoryResponse.json();
 
-    const tickets = await db.query.ticketsTable.findMany({
-      where: (ticketsTable, { eq }) =>
-        eq(ticketsTable.seatCategoryId, newSeatCategory.id),
+      const tickets = await db.query.ticketsTable.findMany({
+        where: (ticketsTable, { eq }) =>
+          eq(ticketsTable.seatCategoryId, newSeatCategory.id),
+      });
+
+      // 5 rows * 10 seats per row = 50 tickets
+      expect(tickets.length).toBe(50);
     });
 
-    // 5 rows * 10 seats per row = 50 tickets
-    expect(tickets.length).toBe(50);
-  });
+    it("should not add tickets when seat category creation fails", async () => {
+      const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
+      const newEventResponse = await client.api.tickets.events.$post(
+        {
+          json: {
+            date: new Date(new Date().getTime() + 3600 * 1000),
+
+            desc: "Some event description",
+            title: "Event for seat category",
+            imageUrl: "https://example.com/image.jpg",
+          },
+        },
+        {
+          headers: {
+            Cookie: cookieJwt,
+          },
+        },
+      );
+
+      const newEvent = await newEventResponse.json();
+
+      // First seat category creation
+      await client.api.tickets.events[":eventId"]["seat-categories"].$post(
+        {
+          json: {
+            startRow: 1,
+            endRow: 5,
+            price: 100,
+            seatsPerRow: 10,
+          },
+          param: {
+            eventId: newEvent.id,
+          },
+        },
+        {
+          headers: {
+            Cookie: cookieJwt,
+          },
+        },
+      );
+
+      // Second seat category creation with overlapping rows
+      const newSeatCategoryResponse2 = await client.api.tickets.events[
+        ":eventId"
+      ]["seat-categories"].$post(
+        {
+          json: {
+            startRow: 3, // Overlaps with previous seat category
+            endRow: 7,
+            price: 100,
+            seatsPerRow: 10,
+          },
+          param: {
+            eventId: newEvent.id,
+          },
+        },
+        {
+          headers: {
+            Cookie: cookieJwt,
+          },
+        },
+      );
+
+      expect(newSeatCategoryResponse2.status).toBe(400);
+      const newSeatCategory2 = await newSeatCategoryResponse2.json();
+
+      const tickets = await db.query.ticketsTable.findMany({
+        where: (ticketsTable, { eq }) =>
+          eq(ticketsTable.seatCategoryId, newSeatCategory2.id),
+      });
+
+      // No tickets should be created for the failed seat category addition
+      expect(tickets.length).toBe(0);
+    });
+
+    it("created tickets should have null userId by default", async () => {
+      const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+      const newEventResponse = await client.api.tickets.events.$post(
+        {
+          json: {
+            date: new Date(new Date().getTime() + 3600 * 1000),
+
+            desc: "Some event description",
+            title: "Event for seat category",
+            imageUrl: "https://example.com/image.jpg",
+          },
+        },
+        {
+          headers: {
+            Cookie: cookieJwt,
+          },
+        },
+      );
+
+      const newEvent = await newEventResponse.json();
+      const newSeatCategoryResponse = await client.api.tickets.events[
+        ":eventId"
+      ]["seat-categories"].$post(
+        {
+          json: {
+            startRow: 1,
+            endRow: 5,
+            price: 100,
+            seatsPerRow: 10,
+          },
+          param: {
+            eventId: newEvent.id,
+          },
+        },
+        {
+          headers: {
+            Cookie: cookieJwt,
+          },
+        },
+      );
+
+      expect(newSeatCategoryResponse.status).toBe(201);
+
+      const newSeatCategory = await newSeatCategoryResponse.json();
+
+      const tickets = await db.query.ticketsTable.findMany({
+        where: (ticketsTable, { eq }) =>
+          eq(ticketsTable.seatCategoryId, newSeatCategory.id),
+      });
+
+      for (const ticket of tickets) {
+        expect(ticket.userId).toBeNull();
+      }
+    });
+  });
   it("should call addEventToOutBox when seat category is created", async () => {
     const outboxSpy = vi.spyOn(outbox, "addEventToOutBox");
 
@@ -463,6 +596,7 @@ describe("add seat categories to event", () => {
             id: expect.any(String),
             price,
             seatCategoryId: result.id,
+            date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/), // ISO date format
           }),
         ]),
       }),

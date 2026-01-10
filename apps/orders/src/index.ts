@@ -2,9 +2,9 @@ import { db, pool } from "./db";
 import { app } from "./app";
 import { sql } from "drizzle-orm";
 import { natsWrapper } from "./nats-wrapper";
-// import { TicketCreatedListener } from "./events/ticket-created-listener";
 // import { outboxPublisher } from "./outbox";
 import { pl } from "./logger";
+import { TicketCreatedListener } from "./events/ticket-created-listener";
 
 const main = async () => {
   if (!process.env.JWT_KEY) {
@@ -31,7 +31,7 @@ const main = async () => {
     process.exit(1);
   }
 
-  // new TicketCreatedListener(natsWrapper.js).listen();
+  new TicketCreatedListener(natsWrapper.js).listen();
 
   await db.execute(sql`SELECT 1`).catch((error) => {
     pl.fatal(error, "Failed to connect to Postgres");

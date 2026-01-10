@@ -26,3 +26,14 @@ data:
       "replay_policy": "instant",
       "max_ack_pending": 128
     }
+  ordersConsumer.json: |
+    {
+      "durable_name": "orders-service-durable",
+      "description": "Durable consumer for orders service",
+      "stream_name": "booking",
+      "filter_subjects": ["orders.*", "tickets.*"],
+      "deliver_policy": "all",
+      "ack_policy": "explicit",
+      "replay_policy": "instant",
+      "max_ack_pending": 128
+    }
