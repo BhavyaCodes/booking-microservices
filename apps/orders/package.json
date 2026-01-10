@@ -24,6 +24,7 @@
     "@types/bun": "latest",
     "@types/pg": "^8.16.0",
     "drizzle-kit": "^0.31.8",
+    "uuid": "^13.0.0",
     "vitest": "^4.0.16"
   }
 }
