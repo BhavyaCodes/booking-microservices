@@ -176,14 +176,18 @@ await db.transaction(async (tx) => {
   const [ticket] = await tx.insert(ticketsTable).values(...).returning();
 
   // Add event to outbox (published later by background job)
+  // Note: data is typically an array for batch publishing
   await addEventToOutBox(tx, {
     subject: Subjects.TicketsCreated,
-    data: { id: ticket.id, price: ticket.price, seatCategoryId: ticket.seatCategoryId }
+    data: [{ id: ticket.id, price: ticket.price, seatCategoryId: ticket.seatCategoryId, date: ticket.date.toISOString() }]
   });
 });
 ```
 
-**Event Types**: Defined in [packages/common/nats/events.ts](packages/common/nats/events.ts). Add new events to `NATSEvent` union type.
+**Event Types**: Defined in [packages/common/nats/events.ts](packages/common/nats/events.ts). When adding new events:
+
+- Export type `YourNewEvent = { subject: Subjects.YourEvent; data: YourDataType[] | YourDataType }`
+- Add to `NATSEvent` union type: `export type NATSEvent = TicketCreatedEvent | YourNewEvent`
 
 ### NATS Integration
 
@@ -250,7 +254,9 @@ Every service's `index.ts` follows this structure (see [apps/tickets/src/index.t
 6. Start Bun server on port 3000
 7. Register cleanup handlers (SIGINT/SIGTERM) - drain NATS, release DB connections
 
-**Orders Service**: Currently only has database/NATS setup - no event listeners active yet.
+**Auth Service**: MongoDB, no NATS listeners, simple startup.
+**Tickets Service**: PostgreSQL with outbox pattern, LISTEN/NOTIFY setup required.
+**Orders Service**: PostgreSQL setup done, but event listeners are commented out (uncomment when implementing order consumption).
 
 ## Testing Conventions
 
@@ -273,22 +279,46 @@ Every service's `index.ts` follows this structure (see [apps/tickets/src/index.t
 ```typescript
 import { testClient } from "hono/testing";
 import { app } from "../app";
+import { UserRoles } from "@booking/common/interfaces";
 
 const client = testClient(app);
 
-it("should create event", async () => {
+it("should create event as admin", async () => {
   const cookie = await global.signin({ role: UserRoles.ADMIN });
 
   const res = await client.api.tickets.events.$post(
-    { json: { title: "Test", date: new Date(), desc: "..." } },
+    {
+      json: {
+        title: "Test Event",
+        desc: "Description",
+        date: new Date(Date.now() + 86400000),
+      },
+    },
     { headers: { Cookie: cookie } },
   );
 
   expect(res.status).toBe(201);
 });
+
+it("should return 403 for non-admin users", async () => {
+  const cookie = await global.signin({ role: UserRoles.USER });
+
+  const res = await client.api.tickets.events.$post(
+    {
+      json: {
+        title: "Test",
+        desc: "Test",
+        date: new Date(Date.now() + 86400000),
+      },
+    },
+    { headers: { Cookie: cookie } },
+  );
+
+  expect(res.status).toBe(403);
+});
 ```
 
-Use `testClient` for type-safe RPC-style calls (autocomplete for routes/params).
+Use `testClient` for type-safe RPC-style calls with autocomplete for routes and query params. Always pass `Cookie` header for authenticated routes via second argument options.
 
 ## Key Files Reference
 
