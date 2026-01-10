@@ -18,9 +18,6 @@ export class TicketCreatedListener extends BaseListener<TicketCreatedEvent> {
     const data = msg.json<TicketCreatedEvent["data"]>();
     pl.trace({ data }, "TicketCreated event data");
 
-    // TODO: test duplicate handling
-    // TODO: test on conflict do nothing by inserting directly into the table
-
     const dbData = data.map((ticket) => {
       return {
         id: ticket.id,
@@ -45,6 +42,18 @@ export class TicketCreatedListener extends BaseListener<TicketCreatedEvent> {
       msg.ack();
     } catch (error) {
       pl.error(error, "Failed to insert tickets from TicketCreated event");
+      const deliveryCount = msg.info?.deliveryCount ?? 0;
+      // TODO: add error queue
+      const MAX_REDELIVERIES = 5;
+      if (deliveryCount >= MAX_REDELIVERIES) {
+        pl.error(
+          { deliveryCount: deliveryCount },
+          "Max redeliveries reached for TicketCreated event, acknowledging message to prevent further retries",
+        );
+        msg.ack();
+      } else {
+        msg.nak(5000); // wait 5 seconds before redelivery
+      }
     }
   }
 }
