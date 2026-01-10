@@ -2,7 +2,7 @@
 
 - [x] setup migration for drizzle tickets
 - [x] add userId to tickets service (schema)
-- [ ] listen to tickets.created event on orders srv
+- [x] listen to tickets.created event on orders srv
   - [x] update infra to add new consumer for orders srv
   - [x] update base-listener to allow different consumer orders-service-durable
   - [x] listen on orders srv
