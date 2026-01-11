@@ -6,7 +6,7 @@ import { db } from "../db";
 import { eventsTable } from "../db/schema";
 import * as outbox from "../outbox";
 import { Subjects } from "@booking/common";
-
+import { v7 as uuidv7 } from "uuid";
 const client = testClient(ticketsApp);
 
 describe("check environment NODE_ENV", () => {
@@ -114,17 +114,37 @@ describe("test event creation", () => {
     expect(insertedEvent).toBeDefined();
   });
 
+  it("should throw 400 when invalid date is provided", async () => {
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+    const response = await client.api.tickets.events.$post(
+      {
+        json: {
+          date: new Date("invalid-date"),
+          desc: "Some event description",
+          title: "Some event title",
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(response.status).toBe(400);
+  });
+
   it("should throw 400 when date is in the past", async () => {
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
     const response = await client.api.tickets.events.$post(
       {
-        // @ts-expect-error testing invalid input
         json: {
           date: new Date(new Date().getTime() - 3600 * 1000),
-
-          // desc: "Some event description",
-          // title: title,
+          desc: "Some event description",
+          title: "Some event title",
           imageUrl: "https://example.com/image.jpg",
         },
       },
@@ -202,6 +222,348 @@ describe("test event creation", () => {
     expect(insertedEvent!.draft).toBe(true);
   });
 });
+
+describe("test event update", () => {
+  it("should update event in the database", async () => {
+    const title = "test event title";
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+    const response = await client.api.tickets.events.$post(
+      {
+        json: {
+          date: new Date(new Date().getTime() + 3600 * 1000),
+          desc: "Some event description",
+          title: title,
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(response.status).toBe(201);
+
+    const createdEvent = await response.json();
+
+    const updatedDate = new Date(new Date().getTime() + 7200 * 1000);
+    const updatedDesc = "Updated event description";
+    const updatedTitle = "updated event title";
+    const updatedImageUrl = "https://example.com/updated-image.jpg";
+
+    const updateResponse = await client.api.tickets.events[":eventId"].$patch(
+      {
+        json: {
+          date: updatedDate,
+          desc: updatedDesc,
+          title: updatedTitle,
+          imageUrl: updatedImageUrl,
+          currentVersion: createdEvent.version,
+        },
+        param: {
+          eventId: createdEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(updateResponse.status).toBe(200);
+
+    const updatedEvent = await db.query.eventsTable.findFirst({
+      where: (eventsTable, { eq }) => eq(eventsTable.id, createdEvent.id),
+    });
+
+    expect(updatedEvent).toBeDefined();
+    expect(updatedEvent!.date.toISOString()).toBe(updatedDate.toISOString());
+    expect(updatedEvent!.desc).toBe(updatedDesc);
+    expect(updatedEvent!.title).toBe(updatedTitle);
+    expect(updatedEvent!.imageUrl).toBe(updatedImageUrl);
+  });
+
+  it("should throw 401 when not signed in", async () => {
+    const response = await client.api.tickets.events[":eventId"].$patch({
+      json: {
+        date: new Date(new Date().getTime() + 7200 * 1000),
+        desc: "Updated event description",
+        title: "updated event title",
+        imageUrl: "https://example.com/updated-image.jpg",
+        currentVersion: 0,
+      },
+      param: {
+        eventId: "some-event-id",
+      },
+    });
+
+    expect(response.status).toBe(401);
+  });
+
+  it("should throw 403 when signed in as non-admin user", async () => {
+    const cookieJwt = await global.signin({ role: UserRoles.USER });
+    const response = await client.api.tickets.events[":eventId"].$patch(
+      {
+        json: {
+          date: new Date(new Date().getTime() + 7200 * 1000),
+          desc: "Updated event description",
+          title: "updated event title",
+          imageUrl: "https://example.com/updated-image.jpg",
+          currentVersion: 0,
+        },
+        param: {
+          eventId: "some-event-id",
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("Should throw 409 when updating with stale version", async () => {
+    const title = "test event title";
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+    const response = await client.api.tickets.events.$post(
+      {
+        json: {
+          date: new Date(new Date().getTime() + 3600 * 1000),
+          desc: "Some event description",
+          title: title,
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(response.status).toBe(201);
+
+    const createdEvent = await response.json();
+
+    const updatedDate = new Date(new Date().getTime() + 7200 * 1000);
+    const updatedDesc = "Updated event description";
+    const updatedTitle = "updated event title";
+    const updatedImageUrl = "https://example.com/updated-image.jpg";
+
+    const firstUpdatedResponse = await client.api.tickets.events[
+      ":eventId"
+    ].$patch(
+      {
+        json: {
+          date: updatedDate,
+          desc: updatedDesc,
+          title: updatedTitle,
+          imageUrl: updatedImageUrl,
+          currentVersion: createdEvent.version,
+        },
+        param: {
+          eventId: createdEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(firstUpdatedResponse.status).toBe(200);
+
+    const secondUpdatedResponse = await client.api.tickets.events[
+      ":eventId"
+    ].$patch(
+      {
+        json: {
+          date: updatedDate,
+          desc: updatedDesc,
+          title: updatedTitle,
+          imageUrl: updatedImageUrl,
+          currentVersion: createdEvent.version,
+        },
+        param: {
+          eventId: createdEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(secondUpdatedResponse.status).toBe(409);
+  });
+
+  it("Should throw 400 when invalid date is provided", async () => {
+    const title = "test event title";
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+    const response = await client.api.tickets.events[":eventId"].$patch(
+      {
+        json: {
+          date: "invalid-date",
+          desc: "Some event description",
+          title: title,
+          imageUrl: "https://example.com/image.jpg",
+          currentVersion: 0,
+        },
+        param: {
+          eventId: uuidv7(),
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it("should allow partial updates", async () => {
+    const originalTitle = "original event title";
+    const originalDesc = "original event description";
+    const originalImageUrl = "https://example.com/original-image.jpg";
+    const originalDate = new Date(new Date().getTime() + 3600 * 1000);
+
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+    const response = await client.api.tickets.events.$post(
+      {
+        json: {
+          date: originalDate,
+          desc: originalDesc,
+          title: originalTitle,
+          imageUrl: originalImageUrl,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    const createdEvent = await response.json();
+
+    const updatedTitle = "partially updated event title";
+    const updateResponse = await client.api.tickets.events[":eventId"].$patch(
+      {
+        json: {
+          title: updatedTitle,
+          currentVersion: createdEvent.version,
+        },
+        param: {
+          eventId: createdEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(updateResponse.status).toBe(200);
+
+    const updatedEvent = await db.query.eventsTable.findFirst({
+      where: (eventsTable, { eq }) => eq(eventsTable.id, createdEvent.id),
+    });
+
+    expect(updatedEvent).toBeDefined();
+    expect(updatedEvent!.title).toBe(updatedTitle);
+    expect(updatedEvent!.desc).toBe(originalDesc);
+    expect(updatedEvent!.imageUrl).toBe(originalImageUrl);
+  });
+
+  it("should throw 404 when event to be updated is not found", async () => {
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+    const updateResponse = await client.api.tickets.events[":eventId"].$patch(
+      {
+        json: {
+          currentVersion: 0,
+          title: "some title",
+        },
+        param: { eventId: uuidv7() },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(updateResponse.status).toBe(404);
+  });
+
+  it("Should throw 400 when empty string title is provided", async () => {
+    const originalTitle = "original event title";
+    const originalDesc = "original event description";
+    const originalImageUrl = "https://example.com/original-image.jpg";
+    const originalDate = new Date(new Date().getTime() + 3600 * 1000);
+
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+    const response = await client.api.tickets.events.$post(
+      {
+        json: {
+          date: originalDate,
+          desc: originalDesc,
+          title: originalTitle,
+          imageUrl: originalImageUrl,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    const createdEvent = await response.json();
+
+    const updatedTitle = "";
+    const updateResponse = await client.api.tickets.events[":eventId"].$patch(
+      {
+        json: {
+          title: updatedTitle,
+          currentVersion: createdEvent.version,
+        },
+        param: {
+          eventId: createdEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(updateResponse.status).toBe(400);
+
+    const updatedEvent = await db.query.eventsTable.findFirst({
+      where: (eventsTable, { eq }) => eq(eventsTable.id, createdEvent.id),
+    });
+
+    expect(updatedEvent).toBeDefined();
+    expect(updatedEvent!.title).toBe(originalTitle);
+    expect(updatedEvent!.desc).toBe(originalDesc);
+    expect(updatedEvent!.imageUrl).toBe(originalImageUrl);
+  });
+});
+
 describe("add seat categories to event", () => {
   it("Should throw 400 when event id is not a valid uuid", async () => {
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
