@@ -10,8 +10,8 @@
   - [x] setup tests for listener
 - [ ] update ticket/event/seat category id
   - [ ] endpoint in /api/tickets
-  - [ ] emit event in tickets srv thru outbox -> NATS
-  - [ ] receive event on orders srv
+    <!-- - [ ] emit event in tickets srv thru outbox -> NATS -->
+    <!-- - [ ] receive event on orders srv -->
   - [ ] add endpoint to update draft mode to false
   - [ ] add versioning for updates in db
 
