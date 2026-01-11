@@ -81,7 +81,7 @@ const app = new Hono<{
     ),
     async (c) => {
       try {
-        await db.transaction(async (tx) => {
+        const result = await db.transaction(async (tx) => {
           const foundEventArr = await tx
             .select()
             .from(eventsTable)
@@ -139,48 +139,21 @@ const app = new Hono<{
 
           return updatedEvent[0];
         });
+
+        return c.json(result, 200);
       } catch (error) {
         pl.error(error, "Error updating event");
-        throw new HTTPException(500, {
-          res: new CustomErrorResponse({
-            message: "Failed to update event",
-          }),
-        });
+
+        if (error instanceof HTTPException) {
+          throw error;
+        } else {
+          throw new HTTPException(500, {
+            res: new CustomErrorResponse({
+              message: "Failed to update event",
+            }),
+          });
+        }
       }
-
-      // const foundEvent = await db.query.eventsTable.findFirst({
-      //   where: (eventsTable, { eq }) =>
-      //     eq(eventsTable.id, c.req.param("eventId")),
-      // });
-
-      // if (!foundEvent) {
-      //   throw new HTTPException(404, {
-      //     res: new CustomErrorResponse({
-      //       message: "Event not found",
-      //     }),
-      //   });
-      // }
-
-      // if (foundEvent.version !== c.req.valid("json").currentVersion) {
-      //   throw new HTTPException(409, {
-      //     res: new CustomErrorResponse({
-      //       code: ErrorCodes.INVALID_VERSION,
-      //       message:
-      //         "Event has been modified by another process. Please refresh and try again.",
-      //     }),
-      //   });
-      // }
-
-      // if (foundEvent.draft === false) {
-      //   throw new HTTPException(400, {
-      //     res: new CustomErrorResponse({
-      //       message: "Cannot edit a published event",
-      //     }),
-      //   });
-      // }
-
-      // const { title, desc, date, imageUrl, currentVersion } =
-      //   c.req.valid("json");
     },
   )
   .post(
