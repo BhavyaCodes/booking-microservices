@@ -61,8 +61,7 @@ const app = new Hono<{
   )
   .patch(
     "/api/tickets/events/:eventId",
-    // requireAdmin,
-
+    requireAdmin,
     zValidator("param", z.object({ eventId: z.uuid() }), zodValidationHook),
     zValidator(
       "json",
