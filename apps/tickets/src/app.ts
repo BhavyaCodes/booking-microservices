@@ -6,9 +6,10 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db } from "./db";
 import { eventsTable, seatCategoriesTable, ticketsTable } from "./db/schema";
-import { count } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import {
   CustomErrorResponse,
+  ErrorCodes,
   HTTPException,
   Subjects,
   TicketCreatedEvent,
@@ -56,6 +57,131 @@ const app = new Hono<{
         .returning();
 
       return c.json(newEvent[0], 201);
+    },
+  )
+  .patch(
+    "/api/tickets/events/:eventId",
+    // requireAdmin,
+
+    zValidator("param", z.object({ eventId: z.uuid() }), zodValidationHook),
+    zValidator(
+      "json",
+      z.object({
+        title: z.string().min(1).max(255).optional(),
+        desc: z.string().min(1).max(1000).optional(),
+        date: z.coerce
+          .date()
+          .refine((date) => date >= new Date(), {
+            message: "Date must not be in the past",
+          })
+          .optional(),
+        imageUrl: z.url().max(500).optional(),
+        currentVersion: z.number().int().min(0),
+      }),
+      zodValidationHook,
+    ),
+    async (c) => {
+      try {
+        await db.transaction(async (tx) => {
+          const foundEventArr = await tx
+            .select()
+            .from(eventsTable)
+            .where(eq(eventsTable.id, c.req.param("eventId")))
+            .for("update", { skipLocked: true })
+            .limit(1);
+
+          const foundEvent = foundEventArr[0];
+
+          if (!foundEvent) {
+            throw new HTTPException(404, {
+              res: new CustomErrorResponse({
+                message: "Event not found",
+              }),
+            });
+          }
+
+          if (foundEvent.version !== c.req.valid("json").currentVersion) {
+            throw new HTTPException(409, {
+              res: new CustomErrorResponse({
+                code: ErrorCodes.INVALID_VERSION,
+                message:
+                  "Event has been modified by another process. Please refresh and try again.",
+              }),
+            });
+          }
+
+          if (foundEvent.draft === false) {
+            throw new HTTPException(400, {
+              res: new CustomErrorResponse({
+                message: "Cannot edit a published event",
+              }),
+            });
+          }
+
+          const { title, desc, date, imageUrl, currentVersion } =
+            c.req.valid("json");
+
+          const updatedEvent = await tx
+            .update(eventsTable)
+            .set({
+              title: title ?? foundEvent.title,
+              desc: desc ?? foundEvent.desc,
+              date: date ?? foundEvent.date,
+              imageUrl: imageUrl ?? foundEvent.imageUrl,
+              version: currentVersion + 1,
+            })
+            .where(
+              and(
+                eq(eventsTable.id, c.req.param("eventId")),
+                eq(eventsTable.version, currentVersion),
+              ),
+            )
+            .returning();
+
+          return updatedEvent[0];
+        });
+      } catch (error) {
+        pl.error(error, "Error updating event");
+        throw new HTTPException(500, {
+          res: new CustomErrorResponse({
+            message: "Failed to update event",
+          }),
+        });
+      }
+
+      // const foundEvent = await db.query.eventsTable.findFirst({
+      //   where: (eventsTable, { eq }) =>
+      //     eq(eventsTable.id, c.req.param("eventId")),
+      // });
+
+      // if (!foundEvent) {
+      //   throw new HTTPException(404, {
+      //     res: new CustomErrorResponse({
+      //       message: "Event not found",
+      //     }),
+      //   });
+      // }
+
+      // if (foundEvent.version !== c.req.valid("json").currentVersion) {
+      //   throw new HTTPException(409, {
+      //     res: new CustomErrorResponse({
+      //       code: ErrorCodes.INVALID_VERSION,
+      //       message:
+      //         "Event has been modified by another process. Please refresh and try again.",
+      //     }),
+      //   });
+      // }
+
+      // if (foundEvent.draft === false) {
+      //   throw new HTTPException(400, {
+      //     res: new CustomErrorResponse({
+      //       message: "Cannot edit a published event",
+      //     }),
+      //   });
+      // }
+
+      // const { title, desc, date, imageUrl, currentVersion } =
+      //   c.req.valid("json");
     },
   )
   .post(

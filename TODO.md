@@ -19,3 +19,4 @@
 
 - [x] error helper to make HTTP error payload same across the app
 - [ ] ack policy, retention etc
+- [ ] isolation levels for transactions
