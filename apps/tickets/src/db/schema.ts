@@ -21,6 +21,7 @@ export const eventsTable = pgTable("events", {
   date: timestamp().notNull(),
   draft: boolean().notNull().default(true),
   imageUrl: varchar({ length: 500 }),
+  version: integer().notNull().default(0),
 });
 
 export const seatCategoriesTable = pgTable("seat_categories", {
@@ -34,6 +35,7 @@ export const seatCategoriesTable = pgTable("seat_categories", {
   endRow: integer().notNull(),
   price: integer().notNull(),
   seatsPerRow: integer().notNull(),
+  version: integer().notNull().default(0),
 });
 
 export const ticketsTable = pgTable(
@@ -48,6 +50,8 @@ export const ticketsTable = pgTable(
     row: integer().notNull(),
     seatNumber: integer().notNull(),
     userId: uuid(),
+    version: integer().notNull().default(0),
+    // .$onUpdateFn((): SQL => sql`${ticketsTable.version} + 1`),
   },
   (table) => [
     unique("tickets_seat_unique").on(

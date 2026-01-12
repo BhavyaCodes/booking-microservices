@@ -4,5 +4,9 @@ export default defineConfig({
   test: {
     globals: true,
     setupFiles: ["./src/vitest-setup.ts"],
+    sequence: {
+      concurrent: false,
+    },
+    fileParallelism: false,
   },
 });
