@@ -130,10 +130,10 @@ const app = new Hono<{
               version: currentVersion + 1,
             })
             .where(
-              and(
-                eq(eventsTable.id, c.req.param("eventId")),
-                eq(eventsTable.version, currentVersion),
-              ),
+              // and(
+              eq(eventsTable.id, c.req.param("eventId")),
+              // eq(eventsTable.version, currentVersion),
+              // ),
             )
             .returning();
 
