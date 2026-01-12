@@ -6,7 +6,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db } from "./db";
 import { eventsTable, seatCategoriesTable, ticketsTable } from "./db/schema";
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, ne, or, lt, gt, isNotNull } from "drizzle-orm";
 import {
   CustomErrorResponse,
   ErrorCodes,
@@ -86,7 +86,7 @@ const app = new Hono<{
             .select()
             .from(eventsTable)
             .where(eq(eventsTable.id, c.req.param("eventId")))
-            .for("update", { skipLocked: true })
+            .for("update")
             .limit(1);
 
           const foundEvent = foundEventArr[0];
@@ -292,6 +292,250 @@ const app = new Hono<{
       });
 
       return c.json(newSeatCategory, 201);
+    },
+  )
+  .patch(
+    "/api/tickets/seat-categories/:id",
+    requireAdmin,
+    zValidator("param", z.object({ id: z.uuid() }), zodValidationHook),
+    zValidator(
+      "json",
+      z
+        .object({
+          price: z.number().int().min(1).optional(),
+          startRow: z.number().int().min(1).optional(),
+          endRow: z.number().int().min(1).optional(),
+          seatsPerRow: z.number().int().min(1).optional(),
+          currentVersion: z.number().int().min(0),
+        })
+        .refine(
+          (data) => {
+            if (data.startRow !== undefined && data.endRow !== undefined) {
+              return data.endRow >= data.startRow;
+            }
+            return true;
+          },
+          { error: "End row must be greater than or equal to start row" },
+        ),
+      zodValidationHook,
+    ),
+    async (c) => {
+      try {
+        // check if seat category exists and is linked to draft event
+        const result = await db.transaction(async (tx) => {
+          const foundSeatCategoryArr = await tx
+            .select()
+            .from(seatCategoriesTable)
+            .where(eq(seatCategoriesTable.id, c.req.param("id")))
+            .for("update")
+            .limit(1);
+
+          const foundSeatCategory = foundSeatCategoryArr[0];
+
+          if (!foundSeatCategory) {
+            throw new HTTPException(404, {
+              res: new CustomErrorResponse({
+                message: "Seat category not found",
+              }),
+            });
+          }
+
+          if (
+            foundSeatCategory.version !== c.req.valid("json").currentVersion
+          ) {
+            throw new HTTPException(409, {
+              res: new CustomErrorResponse({
+                code: ErrorCodes.INVALID_VERSION,
+                message:
+                  "Seat category has been modified by another process. Please refresh and try again.",
+              }),
+            });
+          }
+
+          // throw error if any tickets have been booked under this seat category
+
+          const checkIfAnyTicketsBookedArr = await tx
+            .select()
+            .from(ticketsTable)
+            .where(
+              and(
+                eq(ticketsTable.seatCategoryId, foundSeatCategory.id),
+                isNotNull(ticketsTable.userId),
+              ),
+            )
+            .limit(1);
+
+          if (checkIfAnyTicketsBookedArr.length > 0) {
+            throw new HTTPException(400, {
+              res: new CustomErrorResponse({
+                message:
+                  "Cannot modify seat category as some tickets have already been booked",
+              }),
+            });
+          }
+
+          const linkedEventArr = await tx
+            .select()
+            .from(eventsTable)
+            .where(eq(eventsTable.id, foundSeatCategory.eventId))
+            .limit(1);
+
+          const linkedEvent = linkedEventArr[0];
+
+          if (!linkedEvent || linkedEvent.draft === false) {
+            throw new HTTPException(400, {
+              res: new CustomErrorResponse({
+                message:
+                  "Cannot edit seat category linked to a published or non-existing event",
+              }),
+            });
+          }
+
+          const { startRow, endRow, price, seatsPerRow, currentVersion } =
+            c.req.valid("json");
+
+          // if startRow or endRow is being updated, ensure no overlap with other seat categories
+
+          if (startRow || endRow) {
+            const newStartRow = startRow ?? foundSeatCategory.startRow;
+            const newEndRow = endRow ?? foundSeatCategory.endRow;
+
+            // Validate endRow >= startRow for partial updates
+            if (newEndRow < newStartRow) {
+              throw new HTTPException(400, {
+                res: new CustomErrorResponse({
+                  message: "endRow must be greater than or equal to startRow",
+                }),
+              });
+            }
+
+            const existingSeatCategoriesForEvent = await tx
+              .select()
+              .from(seatCategoriesTable)
+              .where(
+                and(
+                  eq(seatCategoriesTable.eventId, foundSeatCategory.eventId),
+                  ne(seatCategoriesTable.id, foundSeatCategory.id),
+                ),
+              )
+              .for("update");
+
+            const hasOverlap = existingSeatCategoriesForEvent.some(
+              (category) => {
+                if (
+                  newStartRow >= category.startRow &&
+                  newStartRow <= category.endRow
+                ) {
+                  return true;
+                }
+
+                if (
+                  newEndRow >= category.startRow &&
+                  newEndRow <= category.endRow
+                ) {
+                  return true;
+                }
+
+                if (
+                  newStartRow <= category.startRow &&
+                  newEndRow >= category.endRow
+                ) {
+                  return true;
+                }
+                return false;
+              },
+            );
+
+            if (hasOverlap) {
+              throw new HTTPException(400, {
+                res: new CustomErrorResponse({
+                  message:
+                    "Seat category rows overlap with existing seat categories",
+                }),
+              });
+            }
+          }
+
+          // update the seat category
+
+          const updatedSeatCategory = await tx
+            .update(seatCategoriesTable)
+            .set({
+              startRow: startRow ?? foundSeatCategory.startRow,
+              endRow: endRow ?? foundSeatCategory.endRow,
+              price: price ?? foundSeatCategory.price,
+              seatsPerRow: seatsPerRow ?? foundSeatCategory.seatsPerRow,
+              version: currentVersion + 1,
+            })
+            .where(
+              and(
+                eq(seatCategoriesTable.id, c.req.param("id")),
+                eq(seatCategoriesTable.version, currentVersion),
+              ),
+            )
+            .returning();
+
+          // update the tickets associated with this seat category if seatsPerRow, startRow or endRow changed
+
+          if (seatsPerRow || startRow || endRow) {
+            const finalStartRow = startRow ?? foundSeatCategory.startRow;
+            const finalEndRow = endRow ?? foundSeatCategory.endRow;
+            const finalSeatsPerRow =
+              seatsPerRow ?? foundSeatCategory.seatsPerRow;
+
+            // delete tickets that are out of the new range
+            await tx
+              .delete(ticketsTable)
+              .where(
+                and(
+                  eq(ticketsTable.seatCategoryId, foundSeatCategory.id),
+                  or(
+                    lt(ticketsTable.row, finalStartRow),
+                    gt(ticketsTable.row, finalEndRow),
+                    gt(ticketsTable.seatNumber, finalSeatsPerRow),
+                  ),
+                ),
+              );
+
+            // add tickets for new seats in the expanded range
+
+            const ticketsToAdd: {
+              seatCategoryId: string;
+              row: number;
+              seatNumber: number;
+            }[] = [];
+
+            // upsert tickets for rows
+            for (let row = finalStartRow; row <= finalEndRow; row++) {
+              for (let seat = 1; seat <= finalSeatsPerRow; seat++) {
+                ticketsToAdd.push({
+                  seatCategoryId: foundSeatCategory.id,
+                  row: row,
+                  seatNumber: seat,
+                });
+              }
+            }
+
+            await tx
+              .insert(ticketsTable)
+              .values(ticketsToAdd)
+              .onConflictDoNothing({
+                target: [
+                  ticketsTable.seatCategoryId,
+                  ticketsTable.row,
+                  ticketsTable.seatNumber,
+                ],
+              });
+          }
+
+          return updatedSeatCategory;
+        });
+
+        return c.json(result[0], 200);
+      } catch (error) {
+        pl.error(error, "Error updating seat category");
+        throw error;
+      }
     },
   )
   .get("/api/tickets/db-info", requireAdmin, async (c) => {

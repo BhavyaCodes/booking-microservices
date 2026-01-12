@@ -9,7 +9,7 @@ import {
   jsonb,
   pgEnum,
 } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
+import { SQL, sql } from "drizzle-orm";
 import { NATSEvent, Subjects } from "@booking/common";
 
 export const eventsTable = pgTable("events", {
@@ -51,6 +51,7 @@ export const ticketsTable = pgTable(
     seatNumber: integer().notNull(),
     userId: uuid(),
     version: integer().notNull().default(0),
+    // .$onUpdateFn((): SQL => sql`${ticketsTable.version} + 1`),
   },
   (table) => [
     unique("tickets_seat_unique").on(
