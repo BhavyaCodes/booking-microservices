@@ -564,6 +564,90 @@ describe("test event update", () => {
     expect(updatedEvent!.desc).toBe(originalDesc);
     expect(updatedEvent!.imageUrl).toBe(originalImageUrl);
   });
+
+  it("Should throw 400 when event is published", async () => {
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+    const newEventResponse = await client.api.tickets.events.$post(
+      {
+        json: {
+          date: new Date(new Date().getTime() + 3600 * 1000),
+
+          desc: "Some event description",
+          title: "Already published event",
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    const newEvent = await newEventResponse.json();
+
+    const seatCategoryResponse = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 5,
+          price: 100,
+          seatsPerRow: 10,
+        },
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(seatCategoryResponse.status).toBe(201);
+
+    // First publish
+    const firstPublishResponse = await client.api.tickets.events[":eventId"][
+      "publish"
+    ].$post(
+      {
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(firstPublishResponse.status).toBe(200);
+
+    // Attempt to update after publishing
+    const updateResponse = await client.api.tickets.events[":eventId"].$patch(
+      {
+        json: {
+          title: "Updated title after publish",
+          currentVersion: newEvent.version,
+        },
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(updateResponse.status).toBe(400);
+  });
 });
 
 describe("add seat categories to event", () => {
@@ -1988,5 +2072,148 @@ describe("test event publish", () => {
     for (const ticket of tickets) {
       expect(ticket.userId).toBeNull();
     }
+  });
+
+  it("should throw 400 when publishing event without seat categories", async () => {
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+    const newEventResponse = await client.api.tickets.events.$post(
+      {
+        json: {
+          date: new Date(new Date().getTime() + 3600 * 1000),
+
+          desc: "Some event description",
+          title: "Event without seat categories",
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    const newEvent = await newEventResponse.json();
+
+    const publishResponse = await client.api.tickets.events[":eventId"][
+      "publish"
+    ].$post(
+      {
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(publishResponse.status).toBe(400);
+  });
+
+  it("should throw 400 when publishing non-existent event", async () => {
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+    const publishResponse = await client.api.tickets.events[":eventId"][
+      "publish"
+    ].$post(
+      {
+        param: {
+          eventId: uuidv7(),
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(publishResponse.status).toBe(400);
+  });
+
+  it("should throw 400 when publishing an already published event", async () => {
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+    const newEventResponse = await client.api.tickets.events.$post(
+      {
+        json: {
+          date: new Date(new Date().getTime() + 3600 * 1000),
+
+          desc: "Some event description",
+          title: "Already published event",
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    const newEvent = await newEventResponse.json();
+
+    const seatCategoryResponse = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 5,
+          price: 100,
+          seatsPerRow: 10,
+        },
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(seatCategoryResponse.status).toBe(201);
+
+    // First publish
+    const firstPublishResponse = await client.api.tickets.events[":eventId"][
+      "publish"
+    ].$post(
+      {
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(firstPublishResponse.status).toBe(200);
+
+    // Second publish attempt
+    const secondPublishResponse = await client.api.tickets.events[":eventId"][
+      "publish"
+    ].$post(
+      {
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(secondPublishResponse.status).toBe(400);
   });
 });
