@@ -2,38 +2,93 @@
 
 ## Architecture Overview
 
-This is a **Bun monorepo** (`workspaces: ["apps/*", "packages/*"]`) for a ticket booking platform with microservices architecture:
+This project is a **Bun monorepo** for a ticket booking platform with a microservices architecture. The main components include:
 
-- **auth**: Authentication service (Hono + MongoDB/Mongoose) - Google OAuth, JWT sessions stored in cookies
-- **tickets**: Ticket/event management (Hono + PostgreSQL/Drizzle) - event-driven with NATS JetStream, implements transactional outbox pattern
-- **orders**: Order processing (Hono + PostgreSQL/Drizzle) - in development, will consume ticket events
-- **client**: Next.js frontend - server-side rendering with Google OAuth integration
-- **packages/common**: Shared library (`@booking/common`) - middlewares, error handling, NATS base classes, interfaces
+- **Auth Service**: Handles authentication using Google OAuth and JWT sessions stored in cookies. Located in `apps/auth/`.
+- **Tickets Service**: Manages ticket/event operations, utilizing PostgreSQL with Drizzle ORM. It implements an event-driven architecture using NATS JetStream. Located in `apps/tickets/`.
+- **Orders Service**: Processes orders based on ticket events. Currently in development. Located in `apps/orders/`.
+- **Client**: A Next.js frontend that integrates with the backend services. Located in `apps/client/`.
+- **Common Package**: Contains shared libraries, middlewares, and interfaces used across services. Located in `packages/common/`.
 
-**Communication Pattern**: Services are async event-driven via **NATS JetStream**. The tickets service publishes events (ticket.created) to NATS streams, and other services consume them. All backend services use **Hono** framework on **Bun** runtime.
+### Data Flow and Communication
 
-**Deployment**: Kubernetes-based with Skaffold for local dev (hot-reload via file sync). Each service has dedicated Postgres/Mongo pods, plus shared NATS JetStream cluster.
+- Services communicate asynchronously via **NATS JetStream**. The Tickets Service publishes events (e.g., `ticket.created`), which the Orders Service consumes.
+- Each service has its own database instance, with PostgreSQL for Tickets and Orders, and MongoDB for Auth.
 
-## Development Workflow
+## Developer Workflows
 
-```bash
-# Install all dependencies (run from root)
-bun install
+### Building and Running Services
+
+- Install dependencies from the root directory:
+  ```bash
+  bun install
+  ```
+- Start local development with Kubernetes:
+  ```bash
+  skaffold dev
+  ```
+  This command deploys all services and enables hot-reloading on file changes.
+
+### Testing
+
+- Run tests for each service:
+  ```bash
+  cd apps/tickets && bun test
+  ```
+  Ensure to start the PostgreSQL container for the Tickets service tests:
+  ```bash
+  docker compose -f postgres-test.docker-compose.yml up
+  ```
+
+### Database Migrations
+
+- For the Tickets and Orders services, run migrations using Drizzle:
+  ```bash
+  cd apps/tickets
+  bun run drizzle-kit:migrate-dev
+  ```
+
+## Project-Specific Conventions
+
+- **Middleware Usage**: Always use `extractCurrentUser` middleware on all routes to populate `currentUser` in the context. This is critical for authentication checks.
+- **Validation**: Use Zod for request validation with the `zValidator` middleware to ensure consistent error handling.
+- **Error Handling**: Use `HTTPException` and `CustomErrorResponse` for structured error responses.
+
+## Integration Points
+
+- **NATS Integration**: Set up NATS connection in `src/nats-wrapper.ts`. Use the `natsWrapper` to publish and subscribe to events.
+- **Outbox Pattern**: Implement the transactional outbox pattern in `src/outbox/index.ts` to ensure event publishing is atomic with database changes.
+
+## Key Files and Directories
+
+- **Auth Service**: [apps/auth/src/app.ts](apps/auth/src/app.ts)
+- **Tickets Service**: [apps/tickets/src/app.ts](apps/tickets/src/app.ts), [apps/tickets/src/db/schema.ts](apps/tickets/src/db/schema.ts)
+- **Outbox Implementation**: [apps/tickets/src/outbox/index.ts](apps/tickets/src/outbox/index.ts)
+- **NATS Wrapper**: [apps/tickets/src/nats-wrapper.ts](apps/tickets/src/nats-wrapper.ts)
+- **Testing Setup**: [apps/tickets/src/vitest-setup.ts](apps/tickets/src/vitest-setup.ts)
+
+---
+
+This document serves as a guide for AI coding agents to navigate and understand the Booking Microservices codebase effectively.bun install
 
 # Local development with Kubernetes (primary workflow)
-skaffold dev                    # Deploys all services, hot-reloads on save
-                                # Requires local k8s (Docker Desktop/minikube)
+
+skaffold dev # Deploys all services, hot-reloads on save # Requires local k8s (Docker Desktop/minikube)
 
 # Run tests (per-service, from service directory)
-cd apps/auth && bun test       # Uses MongoMemoryServer (no external deps)
-cd apps/tickets && bun test    # Requires: docker compose -f postgres-test.docker-compose.yml up
+
+cd apps/auth && bun test # Uses MongoMemoryServer (no external deps)
+cd apps/tickets && bun test # Requires: docker compose -f postgres-test.docker-compose.yml up
 
 # Database migrations (tickets/orders services)
+
 cd apps/tickets
-bun run drizzle-kit:generate-dev  # Generate migration from schema changes
-bun run drizzle-kit:migrate-dev   # Apply migrations (dev env)
+bun run drizzle-kit:generate-dev # Generate migration from schema changes
+bun run drizzle-kit:migrate-dev # Apply migrations (dev env)
+
 # In k8s, migrations run via Jobs before service starts (see tickets-migration-job.yaml)
-```
+
+````
 
 **Important**: Tests don't auto-start containers. For Postgres-based services, manually run `docker compose -f postgres-test.docker-compose.yml up` before testing.
 
@@ -50,7 +105,7 @@ const app = new Hono<{ Variables: { currentUser: CurrentUser } }>()
   .use(extractCurrentUser)          // ALWAYS first - extracts JWT from cookie
   .get("/api/tickets", (c) => ...)  // Chain routes for RPC-style client
   .post("/api/tickets/events", requireAdmin, zValidator(...), handler)
-```
+````
 
 **Critical**: `extractCurrentUser` must run on ALL routes (even public ones) to populate `c.get('currentUser')` when authenticated. It never throws - just sets undefined if no valid token.
 
