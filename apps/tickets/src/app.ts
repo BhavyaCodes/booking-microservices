@@ -506,10 +506,10 @@ const app = new Hono<{
               version: currentVersion + 1,
             })
             .where(
-              and(
-                eq(seatCategoriesTable.id, c.req.param("id")),
-                eq(seatCategoriesTable.version, currentVersion),
-              ),
+              // and(
+              eq(seatCategoriesTable.id, c.req.param("id")),
+              // eq(seatCategoriesTable.version, currentVersion),
+              // ),
             )
             .returning();
 
