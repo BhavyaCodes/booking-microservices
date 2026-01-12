@@ -157,6 +157,44 @@ const app = new Hono<{
     },
   )
   .post(
+    "/api/tickets/events/:eventId/publish",
+    requireAdmin,
+    zValidator("param", z.object({ eventId: z.uuid() }), zodValidationHook),
+    async (c) => {
+      const eventId = c.req.param("eventId");
+
+      // it should have at least one seat category to be published
+      const seatCategoryCount = await db
+        .select({ count: count() })
+        .from(seatCategoriesTable)
+        .where(eq(seatCategoriesTable.eventId, eventId));
+
+      if (seatCategoryCount[0].count === 0) {
+        throw new HTTPException(400, {
+          res: new CustomErrorResponse({
+            message: "Cannot publish event without at least one seat category",
+          }),
+        });
+      }
+
+      const updatedEvent = await db
+        .update(eventsTable)
+        .set({ draft: false })
+        .where(and(eq(eventsTable.id, eventId), eq(eventsTable.draft, true)))
+        .returning();
+
+      if (updatedEvent.length === 0) {
+        throw new HTTPException(400, {
+          res: new CustomErrorResponse({
+            message: "Event not found or already published",
+          }),
+        });
+      }
+
+      return c.json(updatedEvent[0], 200);
+    },
+  )
+  .post(
     "/api/tickets/events/:eventId/seat-categories",
     requireAdmin,
     zValidator("param", z.object({ eventId: z.uuid() }), zodValidationHook),

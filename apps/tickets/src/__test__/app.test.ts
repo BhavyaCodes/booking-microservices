@@ -1910,3 +1910,83 @@ describe("update seat category", () => {
     });
   });
 });
+
+describe("test event publish", () => {
+  it("sets draft to false", async () => {
+    const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
+
+    const newEventResponse = await client.api.tickets.events.$post(
+      {
+        json: {
+          date: new Date(new Date().getTime() + 3600 * 1000),
+
+          desc: "Some event description",
+          title: "Event for seat category publish test",
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    const newEvent = await newEventResponse.json();
+
+    const seatCategoryResponse = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 5,
+          price: 100,
+          seatsPerRow: 10,
+        },
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(seatCategoryResponse.status).toBe(201);
+    const seatCategory = await seatCategoryResponse.json();
+    const publishResponse = await client.api.tickets.events[":eventId"][
+      "publish"
+    ].$post(
+      {
+        param: {
+          eventId: newEvent.id,
+        },
+      },
+      {
+        headers: {
+          Cookie: cookieJwt,
+        },
+      },
+    );
+
+    expect(publishResponse.status).toBe(200);
+
+    const updatedEvent = await db.query.eventsTable.findFirst({
+      where: (table, { eq }) => eq(table.id, newEvent.id),
+    });
+
+    expect(updatedEvent).toBeDefined();
+    expect(updatedEvent!.draft).toBe(false);
+
+    const tickets = await db.query.ticketsTable.findMany({
+      where: (table, { eq }) => eq(table.seatCategoryId, seatCategory.id),
+    });
+
+    for (const ticket of tickets) {
+      expect(ticket.userId).toBeNull();
+    }
+  });
+});
