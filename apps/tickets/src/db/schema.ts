@@ -9,7 +9,7 @@ import {
   jsonb,
   pgEnum,
 } from "drizzle-orm/pg-core";
-import { SQL, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { NATSEvent, Subjects } from "@booking/common";
 
 export const eventsTable = pgTable("events", {
