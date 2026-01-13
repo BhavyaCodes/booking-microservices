@@ -221,7 +221,7 @@ const app = new Hono<{
             draft: false,
             version: currentVersion + 1,
           })
-          .where(and(eq(eventsTable.id, eventId), eq(eventsTable.draft, true)))
+          .where(eq(eventsTable.id, eventId))
           .returning();
 
         if (updatedEvent.length === 0) {
