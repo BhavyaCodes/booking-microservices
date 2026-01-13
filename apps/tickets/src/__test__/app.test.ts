@@ -618,6 +618,9 @@ describe("test event update", () => {
         param: {
           eventId: newEvent.id,
         },
+        json: {
+          currentVersion: newEvent.version,
+        },
       },
       {
         headers: {
@@ -2048,6 +2051,9 @@ describe("test event publish", () => {
         param: {
           eventId: newEvent.id,
         },
+        json: {
+          currentVersion: newEvent.version,
+        },
       },
       {
         headers: {
@@ -2103,6 +2109,9 @@ describe("test event publish", () => {
         param: {
           eventId: newEvent.id,
         },
+        json: {
+          currentVersion: newEvent.version,
+        },
       },
       {
         headers: {
@@ -2123,6 +2132,9 @@ describe("test event publish", () => {
       {
         param: {
           eventId: uuidv7(),
+        },
+        json: {
+          currentVersion: 0,
         },
       },
       {
@@ -2188,6 +2200,9 @@ describe("test event publish", () => {
         param: {
           eventId: newEvent.id,
         },
+        json: {
+          currentVersion: newEvent.version,
+        },
       },
       {
         headers: {
@@ -2205,6 +2220,9 @@ describe("test event publish", () => {
       {
         param: {
           eventId: newEvent.id,
+        },
+        json: {
+          currentVersion: newEvent.version + 1,
         },
       },
       {
