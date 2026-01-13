@@ -630,13 +630,14 @@ describe("test event update", () => {
     );
 
     expect(firstPublishResponse.status).toBe(200);
+    const firstPublishedEvent = await firstPublishResponse.json();
 
     // Attempt to update after publishing
     const updateResponse = await client.api.tickets.events[":eventId"].$patch(
       {
         json: {
           title: "Updated title after publish",
-          currentVersion: newEvent.version,
+          currentVersion: firstPublishedEvent.version,
         },
         param: {
           eventId: newEvent.id,
