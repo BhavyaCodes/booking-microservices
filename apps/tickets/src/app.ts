@@ -129,12 +129,7 @@ const app = new Hono<{
               imageUrl: imageUrl ?? foundEvent.imageUrl,
               version: currentVersion + 1,
             })
-            .where(
-              // and(
-              eq(eventsTable.id, c.req.param("eventId")),
-              // eq(eventsTable.version, currentVersion),
-              // ),
-            )
+            .where(eq(eventsTable.id, c.req.param("eventId")))
             .returning();
 
           return updatedEvent[0];
@@ -160,9 +155,16 @@ const app = new Hono<{
     "/api/tickets/events/:eventId/publish",
     requireAdmin,
     zValidator("param", z.object({ eventId: z.uuid() }), zodValidationHook),
+    zValidator(
+      "json",
+      z.object({
+        currentVersion: z.number().int().min(0),
+      }),
+      zodValidationHook,
+    ),
     async (c) => {
       const eventId = c.req.param("eventId");
-
+      const currentVersion = c.req.valid("json").currentVersion;
       // it should have at least one seat category to be published
       const seatCategoryCount = await db
         .select({ count: count() })
@@ -177,21 +179,63 @@ const app = new Hono<{
         });
       }
 
-      const updatedEvent = await db
-        .update(eventsTable)
-        .set({ draft: false })
-        .where(and(eq(eventsTable.id, eventId), eq(eventsTable.draft, true)))
-        .returning();
+      const result = await db.transaction(async (tx) => {
+        const foundEventArr = await tx
+          .select()
+          .from(eventsTable)
+          .where(eq(eventsTable.id, eventId))
+          .for("update")
+          .limit(1);
 
-      if (updatedEvent.length === 0) {
-        throw new HTTPException(400, {
-          res: new CustomErrorResponse({
-            message: "Event not found or already published",
-          }),
-        });
-      }
+        const foundEvent = foundEventArr[0];
 
-      return c.json(updatedEvent[0], 200);
+        if (!foundEvent) {
+          throw new HTTPException(404, {
+            res: new CustomErrorResponse({
+              message: "Event not found",
+            }),
+          });
+        }
+
+        if (foundEvent.version !== currentVersion) {
+          throw new HTTPException(409, {
+            res: new CustomErrorResponse({
+              code: ErrorCodes.INVALID_VERSION,
+              message:
+                "Event has been modified by another process. Please refresh and try again.",
+            }),
+          });
+        }
+
+        if (foundEvent.draft === false) {
+          throw new HTTPException(400, {
+            res: new CustomErrorResponse({
+              message: "Event is already published",
+            }),
+          });
+        }
+
+        const updatedEvent = await tx
+          .update(eventsTable)
+          .set({
+            draft: false,
+            version: currentVersion + 1,
+          })
+          .where(and(eq(eventsTable.id, eventId), eq(eventsTable.draft, true)))
+          .returning();
+
+        if (updatedEvent.length === 0) {
+          throw new HTTPException(500, {
+            res: new CustomErrorResponse({
+              message: "Internal error publishing event",
+            }),
+          });
+        }
+
+        return updatedEvent[0];
+      });
+
+      return c.json(result, 200);
     },
   )
   .post(
@@ -505,12 +549,7 @@ const app = new Hono<{
               seatsPerRow: seatsPerRow ?? foundSeatCategory.seatsPerRow,
               version: currentVersion + 1,
             })
-            .where(
-              // and(
-              eq(seatCategoriesTable.id, c.req.param("id")),
-              // eq(seatCategoriesTable.version, currentVersion),
-              // ),
-            )
+            .where(eq(seatCategoriesTable.id, c.req.param("id")))
             .returning();
 
           // update the tickets associated with this seat category if seatsPerRow, startRow or endRow changed

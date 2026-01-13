@@ -8,13 +8,16 @@
   - [x] listen on orders srv
   - [x] replicate tickets in orders service
   - [x] setup tests for listener
-- [ ] update ticket/event/seat category id
+- [x] update ticket/event/seat category id
   - [x] endpoint in /api/tickets
     <!-- - [ ] emit event in tickets srv thru outbox -> NATS -->
     <!-- - [ ] receive event on orders srv -->
-  - [ ] add endpoint to update draft mode to false
-  - [ ] add versioning for updates in db
-- [ ] update vitest config in auth
+  - [x] add endpoint to update draft mode to false
+  - [x] add versioning for updates in db
+- [x] update vitest config in auth
+- [ ] manually test flow till edit event + edit seat category + publish + try edit event + try edit seat category
+- [ ] update 409 errors (check PR)
+- [ ] add cron to outbox
 
 ## Later
 
