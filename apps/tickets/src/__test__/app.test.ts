@@ -3038,3 +3038,267 @@ describe("GET /api/tickets/seat-categories/:seatCategoryId/tickets", () => {
     expect(unbookedTicket?.userId).toBe(false);
   });
 });
+
+describe("POST /api/tickets/seat-categories/:seatCategoryId/tickets/reserve", () => {
+  it("should throw 404 if seat category does not exist", async () => {
+    const cookie = await global.signin({ role: UserRoles.USER });
+
+    const response = await client.api.tickets["seat-categories"][
+      ":seatCategoryId"
+    ].tickets.reserve.$post(
+      {
+        param: { seatCategoryId: uuidv7() },
+        json: {
+          ticketIds: [uuidv7(), uuidv7()],
+        },
+      },
+      { headers: { Cookie: cookie } },
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it("should throw 400 if event is in draft mode", async () => {
+    const adminCookie = await global.signin({ role: UserRoles.ADMIN });
+    const userCookie = await global.signin({ role: UserRoles.USER });
+
+    // Create event (draft by default)
+    const eventResponse = await client.api.tickets.admin.events.$post(
+      {
+        json: {
+          title: "Draft event",
+          desc: "Test description",
+          date: new Date(new Date().getTime() + 3600 * 1000),
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+    const event = await eventResponse.json();
+
+    // Create seat category
+    const seatCatResponse = await client.api.tickets.admin.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 3,
+          price: 100,
+          seatsPerRow: 5,
+        },
+        param: { eventId: event.id },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+    const seatCat = await seatCatResponse.json();
+
+    // Try to reserve tickets as regular user (should fail because event is draft)
+    const response = await client.api.tickets["seat-categories"][
+      ":seatCategoryId"
+    ].tickets.reserve.$post(
+      {
+        param: { seatCategoryId: seatCat.id },
+        json: {
+          ticketIds: [uuidv7(), uuidv7()],
+        },
+      },
+      { headers: { Cookie: userCookie } },
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it("should reserve tickets successfully", async () => {
+    const adminCookie = await global.signin({ role: UserRoles.ADMIN });
+    const userCookie = await global.signin({ role: UserRoles.USER });
+
+    // Create event
+    const eventResponse = await client.api.tickets.admin.events.$post(
+      {
+        json: {
+          title: "Published event",
+          desc: "Test description",
+          date: new Date(new Date().getTime() + 3600 * 1000),
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+    const event = await eventResponse.json();
+
+    // Create seat category
+    const seatCatResponse = await client.api.tickets.admin.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 2,
+          price: 100,
+          seatsPerRow: 3,
+        },
+        param: { eventId: event.id },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+    const seatCat = await seatCatResponse.json();
+
+    // Publish event
+    const publishResponse = await client.api.tickets.admin.events[":eventId"][
+      "publish"
+    ].$post(
+      {
+        param: { eventId: event.id },
+        json: { currentVersion: event.version },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+    expect(publishResponse.status).toBe(200);
+
+    // Get tickets for the seat category
+    const ticketsResponse = await client.api.tickets["seat-categories"][
+      ":seatCategoryId"
+    ].tickets.$get(
+      {
+        param: { seatCategoryId: seatCat.id },
+      },
+      { headers: { Cookie: userCookie } },
+    );
+    const tickets = await ticketsResponse.json();
+    const ticketIdsToReserve = tickets.slice(0, 2).map((t) => t.id);
+
+    // Reserve tickets
+    const reserveResponse = await client.api.tickets["seat-categories"][
+      ":seatCategoryId"
+    ].tickets.reserve.$post(
+      {
+        param: { seatCategoryId: seatCat.id },
+        json: {
+          ticketIds: ticketIdsToReserve,
+        },
+      },
+      { headers: { Cookie: userCookie } },
+    );
+
+    expect(reserveResponse.status).toBe(200);
+    const reservedTickets = await reserveResponse.json();
+    expect(reservedTickets).toHaveLength(2);
+    reservedTickets.forEach((t: any) => {
+      expect(ticketIdsToReserve).toContain(t.id);
+      expect(t.userId).toBeDefined();
+    });
+  });
+
+  it("should not reserve already booked tickets", async () => {
+    const adminCookie = await global.signin({ role: UserRoles.ADMIN });
+    const user1Cookie = await global.signin({ role: UserRoles.USER });
+    const user2Cookie = await global.signin({ role: UserRoles.USER });
+
+    // Create event
+    const eventResponse = await client.api.tickets.admin.events.$post(
+      {
+        json: {
+          title: "Published event",
+          desc: "Test description",
+          date: new Date(new Date().getTime() + 3600 * 1000),
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+    const event = await eventResponse.json();
+
+    // Create seat category
+    const seatCatResponse = await client.api.tickets.admin.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 2,
+          price: 100,
+          seatsPerRow: 3,
+        },
+        param: { eventId: event.id },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+    const seatCat = await seatCatResponse.json();
+
+    // Publish event
+    const publishResponse = await client.api.tickets.admin.events[":eventId"][
+      "publish"
+    ].$post(
+      {
+        param: { eventId: event.id },
+        json: { currentVersion: event.version },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+    expect(publishResponse.status).toBe(200);
+
+    // Get tickets for the seat category
+    const ticketsResponse = await client.api.tickets["seat-categories"][
+      ":seatCategoryId"
+    ].tickets.$get(
+      {
+        param: { seatCategoryId: seatCat.id },
+      },
+      { headers: { Cookie: user1Cookie } },
+    );
+    const tickets = await ticketsResponse.json();
+    const ticketIdsToReserve = tickets.slice(0, 2).map((t) => t.id);
+
+    // User 1 reserves tickets
+    const reserveResponse1 = await client.api.tickets["seat-categories"][
+      ":seatCategoryId"
+    ].tickets.reserve.$post(
+      {
+        param: { seatCategoryId: seatCat.id },
+        json: {
+          ticketIds: ticketIdsToReserve,
+        },
+      },
+      { headers: { Cookie: user1Cookie } },
+    );
+
+    expect(reserveResponse1.status).toBe(200);
+    const reservedTickets1 = await reserveResponse1.json();
+    expect(reservedTickets1).toHaveLength(2);
+
+    // User 2 attempts to reserve the same tickets
+    const reserveResponse2 = await client.api.tickets["seat-categories"][
+      ":seatCategoryId"
+    ].tickets.reserve.$post(
+      {
+        param: { seatCategoryId: seatCat.id },
+        json: { ticketIds: ticketIdsToReserve },
+      },
+      { headers: { Cookie: user2Cookie } },
+    );
+
+    expect(reserveResponse2.status).toBe(400);
+    const reservedTickets2 = await reserveResponse2.json();
+
+    // expect(reservedTickets2).toHaveLength(0); // No tickets should be reserved
+  });
+
+  it("should return 400 when no ticket IDs are provided", async () => {
+    const cookie = await global.signin({ role: UserRoles.USER });
+
+    const response = await client.api.tickets["seat-categories"][
+      ":seatCategoryId"
+    ].tickets.reserve.$post(
+      {
+        param: { seatCategoryId: uuidv7() },
+        json: {
+          ticketIds: [],
+        },
+      },
+      { headers: { Cookie: cookie } },
+    );
+
+    expect(response.status).toBe(400);
+  });
+});
