@@ -5,7 +5,7 @@ import {
   requireAdmin,
   requireAuth,
 } from "@booking/common/middlewares";
-import { CurrentUser } from "@booking/common/interfaces";
+import type { CurrentUser } from "@booking/common/interfaces";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db } from "./db";
@@ -652,7 +652,6 @@ const app = new Hono<{
         .from(seatCategoriesTable)
         .where(eq(seatCategoriesTable.eventId, eventId));
 
-      // pl.debug(result, "Seat categories with event join result");
       return c.json(seatCategories, 200);
     },
   )
@@ -779,6 +778,7 @@ const app = new Hono<{
           row: t.tickets.row,
           seatNumber: t.tickets.seatNumber,
           userId: Boolean(t.tickets.userId),
+          eventId: t.tickets.eventId,
         };
       });
 
