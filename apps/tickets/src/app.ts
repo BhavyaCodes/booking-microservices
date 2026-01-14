@@ -5,7 +5,7 @@ import {
   requireAdmin,
   requireAuth,
 } from "@booking/common/middlewares";
-import { CurrentUser, UserRoles } from "@booking/common/interfaces";
+import { CurrentUser } from "@booking/common/interfaces";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db } from "./db";
@@ -698,7 +698,7 @@ const app = new Hono<{
         // Event exists but is in draft mode
         throw new HTTPException(404, {
           res: new CustomErrorResponse({
-            message: "Event not found",
+            message: "Seat category not found",
           }),
         });
       }
@@ -740,6 +740,8 @@ const app = new Hono<{
       const { seatCategoryId } = c.req.param();
 
       // normal user - only return tickets for published events
+
+      // FIXME: might be better to fetch event first to check if published, then fetch tickets
 
       const tickets = await db
         .select()
