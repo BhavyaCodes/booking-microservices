@@ -2305,7 +2305,6 @@ describe("GET /api/tickets/admin/events/:eventId/seat-categories", () => {
     );
 
     const data = await response.json();
-    // pl.debug(data, "seat categories data @@@@@@@@@@@@");
 
     expect(response.status).toBe(200);
 
