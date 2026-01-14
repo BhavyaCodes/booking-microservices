@@ -10,7 +10,18 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db } from "./db";
 import { eventsTable, seatCategoriesTable, ticketsTable } from "./db/schema";
-import { and, count, eq, ne, or, lt, gt, isNotNull } from "drizzle-orm";
+import {
+  and,
+  count,
+  eq,
+  ne,
+  or,
+  lt,
+  gt,
+  isNotNull,
+  isNull,
+  inArray,
+} from "drizzle-orm";
 import {
   CustomErrorResponse,
   ErrorCodes,
@@ -783,6 +794,101 @@ const app = new Hono<{
       });
 
       return c.json(response, 200);
+    },
+  )
+  .post(
+    "/api/tickets/seat-categories/:seatCategoryId/tickets/reserve",
+    requireAuth,
+    zValidator(
+      "param",
+      z.object({ seatCategoryId: z.uuid() }),
+      zodValidationHook,
+    ),
+    zValidator(
+      "json",
+      z.object({
+        ticketIds: z.array(z.uuid()).min(1).max(10),
+      }),
+      zodValidationHook,
+    ),
+    async (c) => {
+      const { seatCategoryId } = c.req.param();
+      const { ticketIds } = c.req.valid("json");
+      const userId = c.get("currentUser").id;
+
+      // check if event is published and date is in future
+
+      try {
+        const reservedTickets = await db.transaction(async (tx) => {
+          const seatCategoryWithEvent = await tx
+            .select()
+            .from(seatCategoriesTable)
+            .where(eq(seatCategoriesTable.id, seatCategoryId))
+            .innerJoin(
+              eventsTable,
+              eq(seatCategoriesTable.eventId, eventsTable.id),
+            )
+            .limit(1);
+
+          if (seatCategoryWithEvent.length === 0) {
+            throw new HTTPException(404, {
+              res: new CustomErrorResponse({
+                message: "Seat category not found",
+              }),
+            });
+          }
+
+          const linkedEvent = seatCategoryWithEvent[0].events;
+
+          if (linkedEvent.draft) {
+            throw new HTTPException(400, {
+              res: new CustomErrorResponse({
+                message: "Event is not published",
+              }),
+            });
+          }
+
+          if (linkedEvent.date < new Date()) {
+            throw new HTTPException(400, {
+              res: new CustomErrorResponse({
+                message: "Cannot reserve tickets for past events",
+              }),
+            });
+          }
+
+          const reservedTickets = await tx
+            .update(ticketsTable)
+            .set({
+              userId,
+            })
+            .where(
+              and(
+                eq(ticketsTable.seatCategoryId, seatCategoryId),
+                inArray(ticketsTable.id, ticketIds),
+                isNull(ticketsTable.userId),
+              ),
+            )
+            .returning();
+
+          if (reservedTickets.length !== ticketIds.length) {
+            throw new HTTPException(400, {
+              res: new CustomErrorResponse({
+                message:
+                  "Some tickets are already reserved or do not exist in the specified seat category",
+              }),
+            });
+          }
+
+          return reservedTickets;
+        });
+
+        return c.json(reservedTickets, 200);
+      } catch (error) {
+        if (!(error instanceof HTTPException)) {
+          pl.error({ error }, "Error reserving tickets");
+        }
+        throw error;
+      }
     },
   )
   // admin route to get counts of events, seat categories and tickets
