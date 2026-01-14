@@ -330,6 +330,7 @@ const app = new Hono<{
             seatCategoryId: string;
             row: number;
             seatNumber: number;
+            eventId: string;
           }[] = [];
 
           for (let row = startRow; row <= endRow; row++) {
@@ -338,6 +339,7 @@ const app = new Hono<{
                 seatCategoryId: newSeatCategory[0].id,
                 row: row,
                 seatNumber: seat,
+                eventId,
               });
             }
           }
@@ -580,6 +582,7 @@ const app = new Hono<{
               seatCategoryId: string;
               row: number;
               seatNumber: number;
+              eventId: string;
             }[] = [];
 
             // upsert tickets for rows
@@ -589,6 +592,7 @@ const app = new Hono<{
                   seatCategoryId: foundSeatCategory.id,
                   row: row,
                   seatNumber: seat,
+                  eventId: foundSeatCategory.eventId,
                 });
               }
             }
