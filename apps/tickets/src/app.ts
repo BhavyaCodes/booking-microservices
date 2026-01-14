@@ -35,7 +35,7 @@ const app = new Hono<{
   })
   // events routes
   .post(
-    "/api/tickets/events",
+    "/api/tickets/admin/events",
     requireAdmin,
     zValidator(
       "json",
@@ -65,7 +65,7 @@ const app = new Hono<{
     },
   )
   .patch(
-    "/api/tickets/events/:eventId",
+    "/api/tickets/admin/events/:eventId",
     requireAdmin,
     zValidator("param", z.object({ eventId: z.uuid() }), zodValidationHook),
     zValidator(
@@ -157,7 +157,7 @@ const app = new Hono<{
     },
   )
   .post(
-    "/api/tickets/events/:eventId/publish",
+    "/api/tickets/admin/events/:eventId/publish",
     requireAdmin,
     zValidator("param", z.object({ eventId: z.uuid() }), zodValidationHook),
     zValidator(
@@ -245,7 +245,7 @@ const app = new Hono<{
   )
   // seat categories routes
   .post(
-    "/api/tickets/events/:eventId/seat-categories",
+    "/api/tickets/admin/events/:eventId/seat-categories",
     requireAdmin,
     zValidator("param", z.object({ eventId: z.uuid() }), zodValidationHook),
     zValidator(
@@ -385,7 +385,7 @@ const app = new Hono<{
     },
   )
   .patch(
-    "/api/tickets/seat-categories/:id",
+    "/api/tickets/admin/seat-categories/:id",
     requireAdmin,
     zValidator("param", z.object({ id: z.uuid() }), zodValidationHook),
     zValidator(
@@ -786,7 +786,7 @@ const app = new Hono<{
     },
   )
   // admin route to get counts of events, seat categories and tickets
-  .get("/api/tickets/db-info", requireAdmin, async (c) => {
+  .get("/api/tickets/admin/db-info", requireAdmin, async (c) => {
     const eventsCount = await db.select({ count: count() }).from(eventsTable);
     const seatCategoriesCount = await db
       .select({ count: count() })

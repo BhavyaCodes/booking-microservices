@@ -19,7 +19,7 @@ describe("check environment NODE_ENV", () => {
 
 describe("test if admin only route protection is working", () => {
   it("should throw 401 when not signed in", async () => {
-    const response = await client.api.tickets.events.$post({
+    const response = await client.api.tickets.admin.events.$post({
       json: {
         date: new Date(),
         desc: "Some event description",
@@ -34,7 +34,7 @@ describe("test if admin only route protection is working", () => {
   it("should throw 403 when signed in as non-admin user", async () => {
     const cookieJwt = await global.signin({ role: UserRoles.USER });
 
-    const response = await client.api.tickets.events.$post(
+    const response = await client.api.tickets.admin.events.$post(
       {
         json: {
           date: new Date(),
@@ -57,7 +57,7 @@ describe("test if admin only route protection is working", () => {
     const title = "test event title";
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-    const response = await client.api.tickets.events.$post(
+    const response = await client.api.tickets.admin.events.$post(
       {
         json: {
           date: new Date(new Date().getTime() + 3600 * 1000),
@@ -90,7 +90,7 @@ describe("test event creation", () => {
     const title = "test event title";
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-    await client.api.tickets.events.$post(
+    await client.api.tickets.admin.events.$post(
       {
         json: {
           date: new Date(new Date().getTime() + 3600 * 1000),
@@ -119,7 +119,7 @@ describe("test event creation", () => {
   it("should throw 400 when invalid date is provided", async () => {
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-    const response = await client.api.tickets.events.$post(
+    const response = await client.api.tickets.admin.events.$post(
       {
         json: {
           date: new Date("invalid-date"),
@@ -141,7 +141,7 @@ describe("test event creation", () => {
   it("should throw 400 when date is in the past", async () => {
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-    const response = await client.api.tickets.events.$post(
+    const response = await client.api.tickets.admin.events.$post(
       {
         json: {
           date: new Date(new Date().getTime() - 3600 * 1000),
@@ -166,7 +166,7 @@ describe("test event creation", () => {
     const titles = ["event 1", "event 2", "event 3"];
 
     for (const title of titles) {
-      await client.api.tickets.events.$post(
+      await client.api.tickets.admin.events.$post(
         {
           json: {
             date: new Date(new Date().getTime() + 3600 * 1000),
@@ -199,7 +199,7 @@ describe("test event creation", () => {
     const title = "draft test event";
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-    await client.api.tickets.events.$post(
+    await client.api.tickets.admin.events.$post(
       {
         json: {
           date: new Date(new Date().getTime() + 3600 * 1000),
@@ -230,7 +230,7 @@ describe("test event update", () => {
     const title = "test event title";
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-    const response = await client.api.tickets.events.$post(
+    const response = await client.api.tickets.admin.events.$post(
       {
         json: {
           date: new Date(new Date().getTime() + 3600 * 1000),
@@ -255,7 +255,9 @@ describe("test event update", () => {
     const updatedTitle = "updated event title";
     const updatedImageUrl = "https://example.com/updated-image.jpg";
 
-    const updateResponse = await client.api.tickets.events[":eventId"].$patch(
+    const updateResponse = await client.api.tickets.admin.events[
+      ":eventId"
+    ].$patch(
       {
         json: {
           date: updatedDate,
@@ -289,7 +291,7 @@ describe("test event update", () => {
   });
 
   it("should throw 401 when not signed in", async () => {
-    const response = await client.api.tickets.events[":eventId"].$patch({
+    const response = await client.api.tickets.admin.events[":eventId"].$patch({
       json: {
         date: new Date(new Date().getTime() + 7200 * 1000),
         desc: "Updated event description",
@@ -307,7 +309,7 @@ describe("test event update", () => {
 
   it("should throw 403 when signed in as non-admin user", async () => {
     const cookieJwt = await global.signin({ role: UserRoles.USER });
-    const response = await client.api.tickets.events[":eventId"].$patch(
+    const response = await client.api.tickets.admin.events[":eventId"].$patch(
       {
         json: {
           date: new Date(new Date().getTime() + 7200 * 1000),
@@ -334,7 +336,7 @@ describe("test event update", () => {
     const title = "test event title";
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-    const response = await client.api.tickets.events.$post(
+    const response = await client.api.tickets.admin.events.$post(
       {
         json: {
           date: new Date(new Date().getTime() + 3600 * 1000),
@@ -359,7 +361,7 @@ describe("test event update", () => {
     const updatedTitle = "updated event title";
     const updatedImageUrl = "https://example.com/updated-image.jpg";
 
-    const firstUpdatedResponse = await client.api.tickets.events[
+    const firstUpdatedResponse = await client.api.tickets.admin.events[
       ":eventId"
     ].$patch(
       {
@@ -383,7 +385,7 @@ describe("test event update", () => {
 
     expect(firstUpdatedResponse.status).toBe(200);
 
-    const secondUpdatedResponse = await client.api.tickets.events[
+    const secondUpdatedResponse = await client.api.tickets.admin.events[
       ":eventId"
     ].$patch(
       {
@@ -411,7 +413,7 @@ describe("test event update", () => {
   it("Should throw 400 when invalid date is provided", async () => {
     const title = "test event title";
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
-    const response = await client.api.tickets.events[":eventId"].$patch(
+    const response = await client.api.tickets.admin.events[":eventId"].$patch(
       {
         json: {
           date: "invalid-date",
@@ -441,7 +443,7 @@ describe("test event update", () => {
     const originalDate = new Date(new Date().getTime() + 3600 * 1000);
 
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
-    const response = await client.api.tickets.events.$post(
+    const response = await client.api.tickets.admin.events.$post(
       {
         json: {
           date: originalDate,
@@ -460,7 +462,9 @@ describe("test event update", () => {
     const createdEvent = await response.json();
 
     const updatedTitle = "partially updated event title";
-    const updateResponse = await client.api.tickets.events[":eventId"].$patch(
+    const updateResponse = await client.api.tickets.admin.events[
+      ":eventId"
+    ].$patch(
       {
         json: {
           title: updatedTitle,
@@ -492,7 +496,9 @@ describe("test event update", () => {
   it("should throw 404 when event to be updated is not found", async () => {
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-    const updateResponse = await client.api.tickets.events[":eventId"].$patch(
+    const updateResponse = await client.api.tickets.admin.events[
+      ":eventId"
+    ].$patch(
       {
         json: {
           currentVersion: 0,
@@ -517,7 +523,7 @@ describe("test event update", () => {
     const originalDate = new Date(new Date().getTime() + 3600 * 1000);
 
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
-    const response = await client.api.tickets.events.$post(
+    const response = await client.api.tickets.admin.events.$post(
       {
         json: {
           date: originalDate,
@@ -536,7 +542,9 @@ describe("test event update", () => {
     const createdEvent = await response.json();
 
     const updatedTitle = "";
-    const updateResponse = await client.api.tickets.events[":eventId"].$patch(
+    const updateResponse = await client.api.tickets.admin.events[
+      ":eventId"
+    ].$patch(
       {
         json: {
           title: updatedTitle,
@@ -568,7 +576,7 @@ describe("test event update", () => {
   it("Should throw 400 when event is published", async () => {
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-    const newEventResponse = await client.api.tickets.events.$post(
+    const newEventResponse = await client.api.tickets.admin.events.$post(
       {
         json: {
           date: new Date(new Date().getTime() + 3600 * 1000),
@@ -587,9 +595,9 @@ describe("test event update", () => {
 
     const newEvent = await newEventResponse.json();
 
-    const seatCategoryResponse = await client.api.tickets.events[":eventId"][
-      "seat-categories"
-    ].$post(
+    const seatCategoryResponse = await client.api.tickets.admin.events[
+      ":eventId"
+    ]["seat-categories"].$post(
       {
         json: {
           startRow: 1,
@@ -611,9 +619,9 @@ describe("test event update", () => {
     expect(seatCategoryResponse.status).toBe(201);
 
     // First publish
-    const firstPublishResponse = await client.api.tickets.events[":eventId"][
-      "publish"
-    ].$post(
+    const firstPublishResponse = await client.api.tickets.admin.events[
+      ":eventId"
+    ]["publish"].$post(
       {
         param: {
           eventId: newEvent.id,
@@ -633,7 +641,9 @@ describe("test event update", () => {
     const firstPublishedEvent = await firstPublishResponse.json();
 
     // Attempt to update after publishing
-    const updateResponse = await client.api.tickets.events[":eventId"].$patch(
+    const updateResponse = await client.api.tickets.admin.events[
+      ":eventId"
+    ].$patch(
       {
         json: {
           title: "Updated title after publish",
@@ -658,9 +668,9 @@ describe("add seat categories to event", () => {
   it("Should throw 400 when event id is not a valid uuid", async () => {
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-    const newSeatCategoryResponse = await client.api.tickets.events[":eventId"][
-      "seat-categories"
-    ].$post(
+    const newSeatCategoryResponse = await client.api.tickets.admin.events[
+      ":eventId"
+    ]["seat-categories"].$post(
       {
         json: {
           startRow: 1,
@@ -685,7 +695,7 @@ describe("add seat categories to event", () => {
   it("should add seat category to an event", async () => {
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-    const newEventResponse = await client.api.tickets.events.$post(
+    const newEventResponse = await client.api.tickets.admin.events.$post(
       {
         json: {
           date: new Date(new Date().getTime() + 3600 * 1000),
@@ -705,9 +715,9 @@ describe("add seat categories to event", () => {
 
     const newEvent = await newEventResponse.json();
 
-    const newSeatCategoryResponse = await client.api.tickets.events[":eventId"][
-      "seat-categories"
-    ].$post(
+    const newSeatCategoryResponse = await client.api.tickets.admin.events[
+      ":eventId"
+    ]["seat-categories"].$post(
       {
         json: {
           startRow: 1,
@@ -732,9 +742,9 @@ describe("add seat categories to event", () => {
   it("Should throw 404 when event is not found", async () => {
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-    const newSeatCategoryResponse = await client.api.tickets.events[":eventId"][
-      "seat-categories"
-    ].$post(
+    const newSeatCategoryResponse = await client.api.tickets.admin.events[
+      ":eventId"
+    ]["seat-categories"].$post(
       {
         json: {
           startRow: 1,
@@ -770,9 +780,9 @@ describe("add seat categories to event", () => {
       })
       .returning();
 
-    const newSeatCategoryResponse = await client.api.tickets.events[":eventId"][
-      "seat-categories"
-    ].$post(
+    const newSeatCategoryResponse = await client.api.tickets.admin.events[
+      ":eventId"
+    ]["seat-categories"].$post(
       {
         json: {
           startRow: 1,
@@ -798,7 +808,7 @@ describe("add seat categories to event", () => {
     it("should add tickets when seat category is created", async () => {
       const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-      const newEventResponse = await client.api.tickets.events.$post(
+      const newEventResponse = await client.api.tickets.admin.events.$post(
         {
           json: {
             date: new Date(new Date().getTime() + 3600 * 1000),
@@ -817,7 +827,7 @@ describe("add seat categories to event", () => {
 
       const newEvent = await newEventResponse.json();
 
-      const newSeatCategoryResponse = await client.api.tickets.events[
+      const newSeatCategoryResponse = await client.api.tickets.admin.events[
         ":eventId"
       ]["seat-categories"].$post(
         {
@@ -854,7 +864,7 @@ describe("add seat categories to event", () => {
     it("should not add tickets when seat category creation fails", async () => {
       const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-      const newEventResponse = await client.api.tickets.events.$post(
+      const newEventResponse = await client.api.tickets.admin.events.$post(
         {
           json: {
             date: new Date(new Date().getTime() + 3600 * 1000),
@@ -874,7 +884,9 @@ describe("add seat categories to event", () => {
       const newEvent = await newEventResponse.json();
 
       // First seat category creation
-      await client.api.tickets.events[":eventId"]["seat-categories"].$post(
+      await client.api.tickets.admin.events[":eventId"][
+        "seat-categories"
+      ].$post(
         {
           json: {
             startRow: 1,
@@ -894,7 +906,7 @@ describe("add seat categories to event", () => {
       );
 
       // Second seat category creation with overlapping rows
-      const newSeatCategoryResponse2 = await client.api.tickets.events[
+      const newSeatCategoryResponse2 = await client.api.tickets.admin.events[
         ":eventId"
       ]["seat-categories"].$post(
         {
@@ -930,7 +942,7 @@ describe("add seat categories to event", () => {
     it("created tickets should have null userId by default", async () => {
       const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-      const newEventResponse = await client.api.tickets.events.$post(
+      const newEventResponse = await client.api.tickets.admin.events.$post(
         {
           json: {
             date: new Date(new Date().getTime() + 3600 * 1000),
@@ -948,7 +960,7 @@ describe("add seat categories to event", () => {
       );
 
       const newEvent = await newEventResponse.json();
-      const newSeatCategoryResponse = await client.api.tickets.events[
+      const newSeatCategoryResponse = await client.api.tickets.admin.events[
         ":eventId"
       ]["seat-categories"].$post(
         {
@@ -988,7 +1000,7 @@ describe("add seat categories to event", () => {
 
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-    const newEventResponse = await client.api.tickets.events.$post(
+    const newEventResponse = await client.api.tickets.admin.events.$post(
       {
         json: {
           date: new Date(new Date().getTime() + 3600 * 1000),
@@ -1012,9 +1024,9 @@ describe("add seat categories to event", () => {
     const seatsPerRow = 10;
     const price = 100;
 
-    const newSeatCategoryResponse = await client.api.tickets.events[":eventId"][
-      "seat-categories"
-    ].$post(
+    const newSeatCategoryResponse = await client.api.tickets.admin.events[
+      ":eventId"
+    ]["seat-categories"].$post(
       {
         json: {
           startRow,
@@ -1068,7 +1080,7 @@ describe("add seat categories to event", () => {
     }> => {
       const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-      const newEventResponse = await client.api.tickets.events.$post(
+      const newEventResponse = await client.api.tickets.admin.events.$post(
         {
           json: {
             date: new Date(new Date().getTime() + 3600 * 1000),
@@ -1087,7 +1099,7 @@ describe("add seat categories to event", () => {
 
       const newEvent = await newEventResponse.json();
 
-      const newSeatCategoryResponse = await client.api.tickets.events[
+      const newSeatCategoryResponse = await client.api.tickets.admin.events[
         ":eventId"
       ]["seat-categories"].$post(
         {
@@ -1108,7 +1120,7 @@ describe("add seat categories to event", () => {
         },
       );
 
-      const newSeatCategoryResponse2 = await client.api.tickets.events[
+      const newSeatCategoryResponse2 = await client.api.tickets.admin.events[
         ":eventId"
       ]["seat-categories"].$post(
         {
@@ -1179,7 +1191,7 @@ describe("add seat categories to event", () => {
 
 describe("update seat category", () => {
   const createEventWithSeatCategory = async (cookieJwt: string) => {
-    const eventResponse = await client.api.tickets.events.$post(
+    const eventResponse = await client.api.tickets.admin.events.$post(
       {
         json: {
           date: new Date(new Date().getTime() + 3600 * 1000),
@@ -1193,9 +1205,9 @@ describe("update seat category", () => {
     expect(eventResponse.status).toBe(201);
     const event = await eventResponse.json();
 
-    const seatCategoryResponse = await client.api.tickets.events[":eventId"][
-      "seat-categories"
-    ].$post(
+    const seatCategoryResponse = await client.api.tickets.admin.events[
+      ":eventId"
+    ]["seat-categories"].$post(
       {
         json: {
           startRow: 1,
@@ -1214,7 +1226,9 @@ describe("update seat category", () => {
   };
 
   it("should throw 401 when not signed in", async () => {
-    const response = await client.api.tickets["seat-categories"][":id"].$patch({
+    const response = await client.api.tickets.admin["seat-categories"][
+      ":id"
+    ].$patch({
       json: {
         price: 150,
         currentVersion: 0,
@@ -1228,7 +1242,9 @@ describe("update seat category", () => {
   it("should throw 403 when signed in as non-admin user", async () => {
     const cookieJwt = await global.signin({ role: UserRoles.USER });
 
-    const response = await client.api.tickets["seat-categories"][":id"].$patch(
+    const response = await client.api.tickets.admin["seat-categories"][
+      ":id"
+    ].$patch(
       {
         json: {
           price: 150,
@@ -1245,7 +1261,9 @@ describe("update seat category", () => {
   it("should throw 400 when invalid UUID is provided", async () => {
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-    const response = await client.api.tickets["seat-categories"][":id"].$patch(
+    const response = await client.api.tickets.admin["seat-categories"][
+      ":id"
+    ].$patch(
       {
         json: {
           price: 150,
@@ -1262,7 +1280,9 @@ describe("update seat category", () => {
   it("should throw 404 when seat category not found", async () => {
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-    const response = await client.api.tickets["seat-categories"][":id"].$patch(
+    const response = await client.api.tickets.admin["seat-categories"][
+      ":id"
+    ].$patch(
       {
         json: {
           price: 150,
@@ -1281,7 +1301,7 @@ describe("update seat category", () => {
     const { seatCategory } = await createEventWithSeatCategory(cookieJwt);
 
     // First update
-    const firstResponse = await client.api.tickets["seat-categories"][
+    const firstResponse = await client.api.tickets.admin["seat-categories"][
       ":id"
     ].$patch(
       {
@@ -1296,7 +1316,7 @@ describe("update seat category", () => {
     expect(firstResponse.status).toBe(200);
 
     // Second update with stale version
-    const secondResponse = await client.api.tickets["seat-categories"][
+    const secondResponse = await client.api.tickets.admin["seat-categories"][
       ":id"
     ].$patch(
       {
@@ -1322,7 +1342,9 @@ describe("update seat category", () => {
       .set({ userId: uuidv7() })
       .where(eq(ticketsTable.seatCategoryId, seatCategory.id));
 
-    const response = await client.api.tickets["seat-categories"][":id"].$patch(
+    const response = await client.api.tickets.admin["seat-categories"][
+      ":id"
+    ].$patch(
       {
         json: {
           price: 150,
@@ -1363,7 +1385,9 @@ describe("update seat category", () => {
       })
       .returning();
 
-    const response = await client.api.tickets["seat-categories"][":id"].$patch(
+    const response = await client.api.tickets.admin["seat-categories"][
+      ":id"
+    ].$patch(
       {
         json: {
           price: 150,
@@ -1381,7 +1405,9 @@ describe("update seat category", () => {
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
     const { seatCategory } = await createEventWithSeatCategory(cookieJwt);
 
-    const response = await client.api.tickets["seat-categories"][":id"].$patch(
+    const response = await client.api.tickets.admin["seat-categories"][
+      ":id"
+    ].$patch(
       {
         json: {
           startRow: 10,
@@ -1402,7 +1428,9 @@ describe("update seat category", () => {
 
     // Original: startRow=1, endRow=10
     // Update only startRow to 15 should fail since endRow=10 < startRow=15
-    const response = await client.api.tickets["seat-categories"][":id"].$patch(
+    const response = await client.api.tickets.admin["seat-categories"][
+      ":id"
+    ].$patch(
       {
         json: {
           startRow: 15,
@@ -1421,7 +1449,9 @@ describe("update seat category", () => {
     const { seatCategory } = await createEventWithSeatCategory(cookieJwt);
 
     const newPrice = 250;
-    const response = await client.api.tickets["seat-categories"][":id"].$patch(
+    const response = await client.api.tickets.admin["seat-categories"][
+      ":id"
+    ].$patch(
       {
         json: {
           price: newPrice,
@@ -1449,7 +1479,9 @@ describe("update seat category", () => {
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
     const { seatCategory } = await createEventWithSeatCategory(cookieJwt);
 
-    const response = await client.api.tickets["seat-categories"][":id"].$patch(
+    const response = await client.api.tickets.admin["seat-categories"][
+      ":id"
+    ].$patch(
       {
         json: {
           price: 200,
@@ -1467,7 +1499,7 @@ describe("update seat category", () => {
 
   describe("row overlap validation on update", () => {
     const setupTwoSeatCategories = async (cookieJwt: string) => {
-      const eventResponse = await client.api.tickets.events.$post(
+      const eventResponse = await client.api.tickets.admin.events.$post(
         {
           json: {
             date: new Date(new Date().getTime() + 3600 * 1000),
@@ -1482,7 +1514,7 @@ describe("update seat category", () => {
       const event = await eventResponse.json();
 
       // Create first seat category: rows 1-10
-      const sc1Response = await client.api.tickets.events[":eventId"][
+      const sc1Response = await client.api.tickets.admin.events[":eventId"][
         "seat-categories"
       ].$post(
         {
@@ -1495,7 +1527,7 @@ describe("update seat category", () => {
       const sc1 = await sc1Response.json();
 
       // Create second seat category: rows 20-30
-      const sc2Response = await client.api.tickets.events[":eventId"][
+      const sc2Response = await client.api.tickets.admin.events[":eventId"][
         "seat-categories"
       ].$post(
         {
@@ -1515,7 +1547,7 @@ describe("update seat category", () => {
       const { sc1, sc2 } = await setupTwoSeatCategories(cookieJwt);
 
       // Try to update sc1 (rows 1-10) to overlap with sc2 (rows 20-30)
-      const response = await client.api.tickets["seat-categories"][
+      const response = await client.api.tickets.admin["seat-categories"][
         ":id"
       ].$patch(
         {
@@ -1536,7 +1568,7 @@ describe("update seat category", () => {
       const { sc1 } = await setupTwoSeatCategories(cookieJwt);
 
       // Update sc1 (rows 1-10) to rows 1-15 (no overlap with rows 20-30)
-      const response = await client.api.tickets["seat-categories"][
+      const response = await client.api.tickets.admin["seat-categories"][
         ":id"
       ].$patch(
         {
@@ -1559,7 +1591,7 @@ describe("update seat category", () => {
       // sc1 is rows 1-10, sc2 is rows 20-30
       // Update sc1 startRow to 5 (still rows 5-10, no overlap with 20-30)
       // This should succeed
-      const response1 = await client.api.tickets["seat-categories"][
+      const response1 = await client.api.tickets.admin["seat-categories"][
         ":id"
       ].$patch(
         {
@@ -1575,7 +1607,7 @@ describe("update seat category", () => {
       const updated = await response1.json();
 
       // Now try to update to rows 25-30 which overlaps with sc2
-      const response2 = await client.api.tickets["seat-categories"][
+      const response2 = await client.api.tickets.admin["seat-categories"][
         ":id"
       ].$patch(
         {
@@ -1596,7 +1628,7 @@ describe("update seat category", () => {
 
       // sc1 is rows 1-10, sc2 is rows 20-30
       // Update sc1 endRow to 20 (rows 1-20, overlaps with 20-30)
-      const response = await client.api.tickets["seat-categories"][
+      const response = await client.api.tickets.admin["seat-categories"][
         ":id"
       ].$patch(
         {
@@ -1618,7 +1650,7 @@ describe("update seat category", () => {
 
       // sc1 is rows 1-10, sc2 is rows 20-30
       // Update sc1 endRow to 19 (rows 1-19, no overlap)
-      const response = await client.api.tickets["seat-categories"][
+      const response = await client.api.tickets.admin["seat-categories"][
         ":id"
       ].$patch(
         {
@@ -1640,7 +1672,7 @@ describe("update seat category", () => {
 
       // sc1 is rows 1-10, sc2 is rows 20-30
       // Update sc1 to rows 15-35 (overlaps with 20-30)
-      const response = await client.api.tickets["seat-categories"][
+      const response = await client.api.tickets.admin["seat-categories"][
         ":id"
       ].$patch(
         {
@@ -1663,7 +1695,7 @@ describe("update seat category", () => {
 
       // sc1 is rows 1-10, sc2 is rows 20-30
       // Update sc1 to rows 1-40 (encompasses sc2 completely)
-      const response = await client.api.tickets["seat-categories"][
+      const response = await client.api.tickets.admin["seat-categories"][
         ":id"
       ].$patch(
         {
@@ -1684,7 +1716,7 @@ describe("update seat category", () => {
       const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
       // Create event
-      const eventResponse = await client.api.tickets.events.$post(
+      const eventResponse = await client.api.tickets.admin.events.$post(
         {
           json: {
             date: new Date(new Date().getTime() + 3600 * 1000),
@@ -1699,7 +1731,7 @@ describe("update seat category", () => {
       const event = await eventResponse.json();
 
       // Create three seat categories: 1-5, 11-15, 21-25
-      const sc1Response = await client.api.tickets.events[":eventId"][
+      const sc1Response = await client.api.tickets.admin.events[":eventId"][
         "seat-categories"
       ].$post(
         {
@@ -1711,7 +1743,9 @@ describe("update seat category", () => {
       expect(sc1Response.status).toBe(201);
       const sc1 = await sc1Response.json();
 
-      await client.api.tickets.events[":eventId"]["seat-categories"].$post(
+      await client.api.tickets.admin.events[":eventId"][
+        "seat-categories"
+      ].$post(
         {
           json: { startRow: 11, endRow: 15, price: 100, seatsPerRow: 10 },
           param: { eventId: event.id },
@@ -1719,7 +1753,9 @@ describe("update seat category", () => {
         { headers: { Cookie: cookieJwt } },
       );
 
-      await client.api.tickets.events[":eventId"]["seat-categories"].$post(
+      await client.api.tickets.admin.events[":eventId"][
+        "seat-categories"
+      ].$post(
         {
           json: { startRow: 21, endRow: 25, price: 100, seatsPerRow: 10 },
           param: { eventId: event.id },
@@ -1728,7 +1764,7 @@ describe("update seat category", () => {
       );
 
       // Update sc1 to rows 6-10 (between 5 and 11, no overlap)
-      const response = await client.api.tickets["seat-categories"][
+      const response = await client.api.tickets.admin["seat-categories"][
         ":id"
       ].$patch(
         {
@@ -1751,7 +1787,7 @@ describe("update seat category", () => {
 
       // sc1 is rows 1-10, sc2 is rows 20-30
       // Update sc1 to rows 1-20 (endRow touches sc2.startRow, which is overlap in our logic)
-      const response = await client.api.tickets["seat-categories"][
+      const response = await client.api.tickets.admin["seat-categories"][
         ":id"
       ].$patch(
         {
@@ -1773,7 +1809,7 @@ describe("update seat category", () => {
 
       // sc1 is rows 1-10, sc2 is rows 20-30
       // Update sc1 to rows 1-19 (maintains gap before sc2)
-      const response = await client.api.tickets["seat-categories"][
+      const response = await client.api.tickets.admin["seat-categories"][
         ":id"
       ].$patch(
         {
@@ -1803,7 +1839,7 @@ describe("update seat category", () => {
       expect(initialTicketCount).toBe(200);
 
       // Update to rows 3-8 (6 rows instead of 10)
-      const response = await client.api.tickets["seat-categories"][
+      const response = await client.api.tickets.admin["seat-categories"][
         ":id"
       ].$patch(
         {
@@ -1839,7 +1875,7 @@ describe("update seat category", () => {
       expect(initialTicketCount).toBe(200);
 
       // Update to rows 1-15 (15 rows instead of 10)
-      const response = await client.api.tickets["seat-categories"][
+      const response = await client.api.tickets.admin["seat-categories"][
         ":id"
       ].$patch(
         {
@@ -1874,7 +1910,7 @@ describe("update seat category", () => {
       expect(initialTicketCount).toBe(200);
 
       // Update to 10 seats per row
-      const response = await client.api.tickets["seat-categories"][
+      const response = await client.api.tickets.admin["seat-categories"][
         ":id"
       ].$patch(
         {
@@ -1912,7 +1948,7 @@ describe("update seat category", () => {
       expect(initialTicketCount).toBe(200);
 
       // Update to 30 seats per row
-      const response = await client.api.tickets["seat-categories"][
+      const response = await client.api.tickets.admin["seat-categories"][
         ":id"
       ].$patch(
         {
@@ -1944,7 +1980,7 @@ describe("update seat category", () => {
         eq(ticketsTable.seatCategoryId, seatCategory.id),
       );
 
-      const response = await client.api.tickets["seat-categories"][
+      const response = await client.api.tickets.admin["seat-categories"][
         ":id"
       ].$patch(
         {
@@ -1972,7 +2008,7 @@ describe("update seat category", () => {
 
       // Original: rows 1-10, 20 seats per row = 200 tickets
       // Update to: rows 5-15 (11 rows), 15 seats per row = 165 tickets
-      const response = await client.api.tickets["seat-categories"][
+      const response = await client.api.tickets.admin["seat-categories"][
         ":id"
       ].$patch(
         {
@@ -2003,7 +2039,7 @@ describe("test event publish", () => {
   it("sets draft to false", async () => {
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-    const newEventResponse = await client.api.tickets.events.$post(
+    const newEventResponse = await client.api.tickets.admin.events.$post(
       {
         json: {
           date: new Date(new Date().getTime() + 3600 * 1000),
@@ -2022,9 +2058,9 @@ describe("test event publish", () => {
 
     const newEvent = await newEventResponse.json();
 
-    const seatCategoryResponse = await client.api.tickets.events[":eventId"][
-      "seat-categories"
-    ].$post(
+    const seatCategoryResponse = await client.api.tickets.admin.events[
+      ":eventId"
+    ]["seat-categories"].$post(
       {
         json: {
           startRow: 1,
@@ -2045,7 +2081,7 @@ describe("test event publish", () => {
 
     expect(seatCategoryResponse.status).toBe(201);
     const seatCategory = await seatCategoryResponse.json();
-    const publishResponse = await client.api.tickets.events[":eventId"][
+    const publishResponse = await client.api.tickets.admin.events[":eventId"][
       "publish"
     ].$post(
       {
@@ -2084,7 +2120,7 @@ describe("test event publish", () => {
   it("should throw 400 when publishing event without seat categories", async () => {
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-    const newEventResponse = await client.api.tickets.events.$post(
+    const newEventResponse = await client.api.tickets.admin.events.$post(
       {
         json: {
           date: new Date(new Date().getTime() + 3600 * 1000),
@@ -2103,7 +2139,7 @@ describe("test event publish", () => {
 
     const newEvent = await newEventResponse.json();
 
-    const publishResponse = await client.api.tickets.events[":eventId"][
+    const publishResponse = await client.api.tickets.admin.events[":eventId"][
       "publish"
     ].$post(
       {
@@ -2127,7 +2163,7 @@ describe("test event publish", () => {
   it("should throw 400 when publishing non-existent event", async () => {
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-    const publishResponse = await client.api.tickets.events[":eventId"][
+    const publishResponse = await client.api.tickets.admin.events[":eventId"][
       "publish"
     ].$post(
       {
@@ -2151,7 +2187,7 @@ describe("test event publish", () => {
   it("should throw 400 when publishing an already published event", async () => {
     const cookieJwt = await global.signin({ role: UserRoles.ADMIN });
 
-    const newEventResponse = await client.api.tickets.events.$post(
+    const newEventResponse = await client.api.tickets.admin.events.$post(
       {
         json: {
           date: new Date(new Date().getTime() + 3600 * 1000),
@@ -2170,9 +2206,9 @@ describe("test event publish", () => {
 
     const newEvent = await newEventResponse.json();
 
-    const seatCategoryResponse = await client.api.tickets.events[":eventId"][
-      "seat-categories"
-    ].$post(
+    const seatCategoryResponse = await client.api.tickets.admin.events[
+      ":eventId"
+    ]["seat-categories"].$post(
       {
         json: {
           startRow: 1,
@@ -2194,9 +2230,9 @@ describe("test event publish", () => {
     expect(seatCategoryResponse.status).toBe(201);
 
     // First publish
-    const firstPublishResponse = await client.api.tickets.events[":eventId"][
-      "publish"
-    ].$post(
+    const firstPublishResponse = await client.api.tickets.admin.events[
+      ":eventId"
+    ]["publish"].$post(
       {
         param: {
           eventId: newEvent.id,
@@ -2215,9 +2251,9 @@ describe("test event publish", () => {
     expect(firstPublishResponse.status).toBe(200);
 
     // Second publish attempt
-    const secondPublishResponse = await client.api.tickets.events[":eventId"][
-      "publish"
-    ].$post(
+    const secondPublishResponse = await client.api.tickets.admin.events[
+      ":eventId"
+    ]["publish"].$post(
       {
         param: {
           eventId: newEvent.id,
@@ -2281,7 +2317,7 @@ describe("GET /api/tickets/admin/events/:eventId/seat-categories", () => {
   it("should return empty array when event exists but has no seat categories", async () => {
     const cookie = await global.signin({ role: UserRoles.ADMIN });
 
-    const eventResponse = await client.api.tickets.events.$post(
+    const eventResponse = await client.api.tickets.admin.events.$post(
       {
         json: {
           title: "Event without seat categories",
@@ -2315,7 +2351,7 @@ describe("GET /api/tickets/admin/events/:eventId/seat-categories", () => {
   it("should return all seat categories for an event", async () => {
     const cookie = await global.signin({ role: UserRoles.ADMIN });
 
-    const eventResponse = await client.api.tickets.events.$post(
+    const eventResponse = await client.api.tickets.admin.events.$post(
       {
         json: {
           title: "Event with seat categories",
@@ -2330,7 +2366,7 @@ describe("GET /api/tickets/admin/events/:eventId/seat-categories", () => {
     const event = await eventResponse.json();
 
     // Create two seat categories
-    const seatCat1Response = await client.api.tickets.events[":eventId"][
+    const seatCat1Response = await client.api.tickets.admin.events[":eventId"][
       "seat-categories"
     ].$post(
       {
@@ -2346,7 +2382,7 @@ describe("GET /api/tickets/admin/events/:eventId/seat-categories", () => {
     );
     const seatCat1 = await seatCat1Response.json();
 
-    const seatCat2Response = await client.api.tickets.events[":eventId"][
+    const seatCat2Response = await client.api.tickets.admin.events[":eventId"][
       "seat-categories"
     ].$post(
       {
@@ -2426,7 +2462,7 @@ describe("GET /api/tickets/events/:eventId/seat-categories", () => {
     const adminCookie = await global.signin({ role: UserRoles.ADMIN });
     const userCookie = await global.signin({ role: UserRoles.USER });
 
-    const eventResponse = await client.api.tickets.events.$post(
+    const eventResponse = await client.api.tickets.admin.events.$post(
       {
         json: {
           title: "Draft event",
@@ -2456,7 +2492,7 @@ describe("GET /api/tickets/events/:eventId/seat-categories", () => {
     const adminCookie = await global.signin({ role: UserRoles.ADMIN });
     const userCookie = await global.signin({ role: UserRoles.USER });
 
-    const eventResponse = await client.api.tickets.events.$post(
+    const eventResponse = await client.api.tickets.admin.events.$post(
       {
         json: {
           title: "Published event without seat categories",
@@ -2471,7 +2507,7 @@ describe("GET /api/tickets/events/:eventId/seat-categories", () => {
     const event = await eventResponse.json();
 
     // Create and publish event (requires at least one seat category)
-    const seatCatResponse = await client.api.tickets.events[":eventId"][
+    const seatCatResponse = await client.api.tickets.admin.events[":eventId"][
       "seat-categories"
     ].$post(
       {
@@ -2487,7 +2523,7 @@ describe("GET /api/tickets/events/:eventId/seat-categories", () => {
     );
     expect(seatCatResponse.status).toBe(201);
 
-    const publishResponse = await client.api.tickets.events[":eventId"][
+    const publishResponse = await client.api.tickets.admin.events[":eventId"][
       "publish"
     ].$post(
       {
@@ -2517,7 +2553,7 @@ describe("GET /api/tickets/events/:eventId/seat-categories", () => {
     const adminCookie = await global.signin({ role: UserRoles.ADMIN });
     const userCookie = await global.signin({ role: UserRoles.USER });
 
-    const eventResponse = await client.api.tickets.events.$post(
+    const eventResponse = await client.api.tickets.admin.events.$post(
       {
         json: {
           title: "Published event with seat categories",
@@ -2532,7 +2568,7 @@ describe("GET /api/tickets/events/:eventId/seat-categories", () => {
     const event = await eventResponse.json();
 
     // Create seat categories
-    const seatCat1Response = await client.api.tickets.events[":eventId"][
+    const seatCat1Response = await client.api.tickets.admin.events[":eventId"][
       "seat-categories"
     ].$post(
       {
@@ -2548,7 +2584,7 @@ describe("GET /api/tickets/events/:eventId/seat-categories", () => {
     );
     expect(seatCat1Response.status).toBe(201);
 
-    const seatCat2Response = await client.api.tickets.events[":eventId"][
+    const seatCat2Response = await client.api.tickets.admin.events[":eventId"][
       "seat-categories"
     ].$post(
       {
@@ -2565,7 +2601,7 @@ describe("GET /api/tickets/events/:eventId/seat-categories", () => {
     expect(seatCat2Response.status).toBe(201);
 
     // Publish event
-    const publishResponse = await client.api.tickets.events[":eventId"][
+    const publishResponse = await client.api.tickets.admin.events[":eventId"][
       "publish"
     ].$post(
       {
@@ -2657,7 +2693,7 @@ describe("GET /api/tickets/admin/seat-categories/:seatCategoryId/tickets", () =>
     const cookie = await global.signin({ role: UserRoles.ADMIN });
 
     // Create event
-    const eventResponse = await client.api.tickets.events.$post(
+    const eventResponse = await client.api.tickets.admin.events.$post(
       {
         json: {
           title: "Test event",
@@ -2671,7 +2707,7 @@ describe("GET /api/tickets/admin/seat-categories/:seatCategoryId/tickets", () =>
     const event = await eventResponse.json();
 
     // Create seat category
-    const seatCatResponse = await client.api.tickets.events[":eventId"][
+    const seatCatResponse = await client.api.tickets.admin.events[":eventId"][
       "seat-categories"
     ].$post(
       {
@@ -2708,7 +2744,7 @@ describe("GET /api/tickets/admin/seat-categories/:seatCategoryId/tickets", () =>
   it("should return tickets with all properties", async () => {
     const cookie = await global.signin({ role: UserRoles.ADMIN });
 
-    const eventResponse = await client.api.tickets.events.$post(
+    const eventResponse = await client.api.tickets.admin.events.$post(
       {
         json: {
           title: "Test event",
@@ -2721,7 +2757,7 @@ describe("GET /api/tickets/admin/seat-categories/:seatCategoryId/tickets", () =>
     );
     const event = await eventResponse.json();
 
-    const seatCatResponse = await client.api.tickets.events[":eventId"][
+    const seatCatResponse = await client.api.tickets.admin.events[":eventId"][
       "seat-categories"
     ].$post(
       {
@@ -2807,7 +2843,7 @@ describe("GET /api/tickets/seat-categories/:seatCategoryId/tickets", () => {
     const userCookie = await global.signin({ role: UserRoles.USER });
 
     // Create event (draft by default)
-    const eventResponse = await client.api.tickets.events.$post(
+    const eventResponse = await client.api.tickets.admin.events.$post(
       {
         json: {
           title: "Draft event",
@@ -2821,7 +2857,7 @@ describe("GET /api/tickets/seat-categories/:seatCategoryId/tickets", () => {
     const event = await eventResponse.json();
 
     // Create seat category
-    const seatCatResponse = await client.api.tickets.events[":eventId"][
+    const seatCatResponse = await client.api.tickets.admin.events[":eventId"][
       "seat-categories"
     ].$post(
       {
@@ -2855,7 +2891,7 @@ describe("GET /api/tickets/seat-categories/:seatCategoryId/tickets", () => {
     const userCookie = await global.signin({ role: UserRoles.USER });
 
     // Create event
-    const eventResponse = await client.api.tickets.events.$post(
+    const eventResponse = await client.api.tickets.admin.events.$post(
       {
         json: {
           title: "Published event",
@@ -2869,7 +2905,7 @@ describe("GET /api/tickets/seat-categories/:seatCategoryId/tickets", () => {
     const event = await eventResponse.json();
 
     // Create seat category
-    const seatCatResponse = await client.api.tickets.events[":eventId"][
+    const seatCatResponse = await client.api.tickets.admin.events[":eventId"][
       "seat-categories"
     ].$post(
       {
@@ -2886,7 +2922,7 @@ describe("GET /api/tickets/seat-categories/:seatCategoryId/tickets", () => {
     const seatCat = await seatCatResponse.json();
 
     // Publish event
-    const publishResponse = await client.api.tickets.events[":eventId"][
+    const publishResponse = await client.api.tickets.admin.events[":eventId"][
       "publish"
     ].$post(
       {
@@ -2929,7 +2965,7 @@ describe("GET /api/tickets/seat-categories/:seatCategoryId/tickets", () => {
     const userCookie = await global.signin({ role: UserRoles.USER });
 
     // Create event
-    const eventResponse = await client.api.tickets.events.$post(
+    const eventResponse = await client.api.tickets.admin.events.$post(
       {
         json: {
           title: "Published event",
@@ -2943,7 +2979,7 @@ describe("GET /api/tickets/seat-categories/:seatCategoryId/tickets", () => {
     const event = await eventResponse.json();
 
     // Create seat category
-    const seatCatResponse = await client.api.tickets.events[":eventId"][
+    const seatCatResponse = await client.api.tickets.admin.events[":eventId"][
       "seat-categories"
     ].$post(
       {
@@ -2960,7 +2996,7 @@ describe("GET /api/tickets/seat-categories/:seatCategoryId/tickets", () => {
     const seatCat = await seatCatResponse.json();
 
     // Publish event
-    const publishResponse = await client.api.tickets.events[":eventId"][
+    const publishResponse = await client.api.tickets.admin.events[":eventId"][
       "publish"
     ].$post(
       {
