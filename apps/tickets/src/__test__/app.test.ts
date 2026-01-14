@@ -2453,7 +2453,7 @@ describe("GET /api/tickets/events/:eventId/seat-categories", () => {
     expect(response.status).toBe(404);
   });
 
-  it("should return empty array for published event with no seat categories", async () => {
+  it("should return one seat category for published event", async () => {
     const adminCookie = await global.signin({ role: UserRoles.ADMIN });
     const userCookie = await global.signin({ role: UserRoles.USER });
 
