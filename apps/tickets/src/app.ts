@@ -1,7 +1,11 @@
 import { Hono } from "hono";
 
-import { extractCurrentUser, requireAdmin } from "@booking/common/middlewares";
-import { CurrentUser } from "@booking/common/interfaces";
+import {
+  extractCurrentUser,
+  requireAdmin,
+  requireAuth,
+} from "@booking/common/middlewares";
+import type { CurrentUser } from "@booking/common/interfaces";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db } from "./db";
@@ -29,6 +33,7 @@ const app = new Hono<{
   .get("/api/tickets", (c) => {
     return c.json({ message: "Hello ticket service !!" });
   })
+  // events routes
   .post(
     "/api/tickets/events",
     requireAdmin,
@@ -238,6 +243,7 @@ const app = new Hono<{
       return c.json(result, 200);
     },
   )
+  // seat categories routes
   .post(
     "/api/tickets/events/:eventId/seat-categories",
     requireAdmin,
@@ -330,6 +336,7 @@ const app = new Hono<{
             seatCategoryId: string;
             row: number;
             seatNumber: number;
+            eventId: string;
           }[] = [];
 
           for (let row = startRow; row <= endRow; row++) {
@@ -338,6 +345,7 @@ const app = new Hono<{
                 seatCategoryId: newSeatCategory[0].id,
                 row: row,
                 seatNumber: seat,
+                eventId,
               });
             }
           }
@@ -580,6 +588,7 @@ const app = new Hono<{
               seatCategoryId: string;
               row: number;
               seatNumber: number;
+              eventId: string;
             }[] = [];
 
             // upsert tickets for rows
@@ -589,6 +598,7 @@ const app = new Hono<{
                   seatCategoryId: foundSeatCategory.id,
                   row: row,
                   seatNumber: seat,
+                  eventId: foundSeatCategory.eventId,
                 });
               }
             }
@@ -615,6 +625,167 @@ const app = new Hono<{
       }
     },
   )
+  .get(
+    "/api/tickets/admin/events/:eventId/seat-categories",
+    requireAdmin,
+    zValidator("param", z.object({ eventId: z.uuid() }), zodValidationHook),
+    async (c) => {
+      const { eventId } = c.req.param();
+
+      const event = await db.query.eventsTable.findFirst({
+        where: (eventsTable, { eq }) => eq(eventsTable.id, eventId),
+        columns: {
+          id: true,
+        },
+      });
+
+      if (!event) {
+        throw new HTTPException(404, {
+          res: new CustomErrorResponse({
+            message: "Event not found",
+          }),
+        });
+      }
+
+      const seatCategories = await db
+        .select()
+        .from(seatCategoriesTable)
+        .where(eq(seatCategoriesTable.eventId, eventId));
+
+      return c.json(seatCategories, 200);
+    },
+  )
+  .get(
+    "/api/tickets/events/:eventId/seat-categories",
+    requireAuth,
+    zValidator("param", z.object({ eventId: z.uuid() }), zodValidationHook),
+    async (c) => {
+      const { eventId } = c.req.param();
+      const eventsSubquery = db
+        .select()
+        .from(eventsTable)
+        .where(eq(eventsTable.draft, false))
+        .as("event");
+
+      const result = await db
+        .select()
+        .from(seatCategoriesTable)
+        .where(eq(seatCategoriesTable.eventId, eventId))
+        .innerJoinLateral(
+          eventsSubquery,
+          eq(seatCategoriesTable.eventId, eventsSubquery.id),
+        );
+
+      pl.debug(result, "Seat categories with event join result");
+
+      // Check if event exists and is published by verifying if we got any results
+      // with valid event data, or if no results, event doesn't exist or is in draft
+      if (result.length === 0) {
+        // Check if event exists at all
+        const event = await db.query.eventsTable.findFirst({
+          where: eq(eventsTable.id, eventId),
+        });
+
+        if (!event) {
+          throw new HTTPException(404, {
+            res: new CustomErrorResponse({
+              message: "Event not found",
+            }),
+          });
+        }
+
+        // Event exists but is in draft mode
+        throw new HTTPException(404, {
+          res: new CustomErrorResponse({
+            message: "Seat category not found",
+          }),
+        });
+      }
+
+      const seatCategories = result.map((r) => r.seat_categories);
+
+      return c.json(seatCategories, 200);
+    },
+  )
+  // tickets routes
+  .get(
+    "/api/tickets/admin/seat-categories/:seatCategoryId/tickets",
+    requireAdmin,
+    zValidator(
+      "param",
+      z.object({ seatCategoryId: z.uuid() }),
+      zodValidationHook,
+    ),
+    async (c) => {
+      const { seatCategoryId } = c.req.param();
+
+      const tickets = await db.query.ticketsTable.findMany({
+        where: (ticketsTable, { eq }) =>
+          eq(ticketsTable.seatCategoryId, seatCategoryId),
+      });
+
+      return c.json(tickets, 200);
+    },
+  )
+  .get(
+    "/api/tickets/seat-categories/:seatCategoryId/tickets",
+    requireAuth,
+    zValidator(
+      "param",
+      z.object({ seatCategoryId: z.uuid() }),
+      zodValidationHook,
+    ),
+    async (c) => {
+      const { seatCategoryId } = c.req.param();
+
+      // normal user - only return tickets for published events
+
+      // FIXME: might be better to fetch event first to check if published, then fetch tickets
+
+      const tickets = await db
+        .select()
+        .from(ticketsTable)
+        .where(eq(ticketsTable.seatCategoryId, seatCategoryId))
+        .innerJoin(
+          seatCategoriesTable,
+          eq(ticketsTable.seatCategoryId, seatCategoriesTable.id),
+        )
+        .innerJoin(
+          eventsTable,
+          eq(seatCategoriesTable.eventId, eventsTable.id),
+        );
+
+      if (tickets.length === 0) {
+        throw new HTTPException(404, {
+          res: new CustomErrorResponse({
+            message: "No tickets found for the given seat category",
+          }),
+        });
+      }
+
+      if (tickets[0].events.draft) {
+        throw new HTTPException(404, {
+          res: new CustomErrorResponse({
+            message: "Event not found",
+          }),
+        });
+      }
+
+      const response = tickets.map((t) => {
+        return {
+          id: t.tickets.id,
+          seatCategoryId: t.tickets.seatCategoryId,
+          row: t.tickets.row,
+          seatNumber: t.tickets.seatNumber,
+          userId: Boolean(t.tickets.userId),
+          eventId: t.tickets.eventId,
+        };
+      });
+
+      return c.json(response, 200);
+    },
+  )
+  // admin route to get counts of events, seat categories and tickets
   .get("/api/tickets/db-info", requireAdmin, async (c) => {
     const eventsCount = await db.select({ count: count() }).from(eventsTable);
     const seatCategoriesCount = await db

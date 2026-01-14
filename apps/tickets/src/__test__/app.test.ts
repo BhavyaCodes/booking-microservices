@@ -630,13 +630,14 @@ describe("test event update", () => {
     );
 
     expect(firstPublishResponse.status).toBe(200);
+    const firstPublishedEvent = await firstPublishResponse.json();
 
     // Attempt to update after publishing
     const updateResponse = await client.api.tickets.events[":eventId"].$patch(
       {
         json: {
           title: "Updated title after publish",
-          currentVersion: newEvent.version,
+          currentVersion: firstPublishedEvent.version,
         },
         param: {
           eventId: newEvent.id,
@@ -2233,5 +2234,771 @@ describe("test event publish", () => {
     );
 
     expect(secondPublishResponse.status).toBe(400);
+  });
+});
+
+describe("GET /api/tickets/admin/events/:eventId/seat-categories", () => {
+  it("should throw 401 when not authenticated", async () => {
+    const response = await client.api.tickets.admin.events[":eventId"][
+      "seat-categories"
+    ].$get({
+      param: { eventId: uuidv7() },
+    });
+
+    expect(response.status).toBe(401);
+  });
+
+  it("should throw 403 when authenticated as non-admin user", async () => {
+    const cookie = await global.signin({ role: UserRoles.USER });
+
+    const response = await client.api.tickets.admin.events[":eventId"][
+      "seat-categories"
+    ].$get(
+      {
+        param: { eventId: uuidv7() },
+      },
+      { headers: { Cookie: cookie } },
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("should throw 400 when invalid event UUID is provided", async () => {
+    const cookie = await global.signin({ role: UserRoles.ADMIN });
+
+    const response = await client.api.tickets.admin.events[":eventId"][
+      "seat-categories"
+    ].$get(
+      {
+        param: { eventId: "invalid-uuid" },
+      },
+      { headers: { Cookie: cookie } },
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it("should return empty array when event exists but has no seat categories", async () => {
+    const cookie = await global.signin({ role: UserRoles.ADMIN });
+
+    const eventResponse = await client.api.tickets.events.$post(
+      {
+        json: {
+          title: "Event without seat categories",
+          desc: "Test description",
+          date: new Date(new Date().getTime() + 3600 * 1000),
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      { headers: { Cookie: cookie } },
+    );
+
+    const event = await eventResponse.json();
+
+    const response = await client.api.tickets.admin.events[":eventId"][
+      "seat-categories"
+    ].$get(
+      {
+        param: { eventId: event.id },
+      },
+      { headers: { Cookie: cookie } },
+    );
+
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+
+    expect(Array.isArray(data)).toBe(true);
+    expect(data).toHaveLength(0);
+  });
+
+  it("should return all seat categories for an event", async () => {
+    const cookie = await global.signin({ role: UserRoles.ADMIN });
+
+    const eventResponse = await client.api.tickets.events.$post(
+      {
+        json: {
+          title: "Event with seat categories",
+          desc: "Test description",
+          date: new Date(new Date().getTime() + 3600 * 1000),
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      { headers: { Cookie: cookie } },
+    );
+
+    const event = await eventResponse.json();
+
+    // Create two seat categories
+    const seatCat1Response = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 5,
+          price: 100,
+          seatsPerRow: 10,
+        },
+        param: { eventId: event.id },
+      },
+      { headers: { Cookie: cookie } },
+    );
+    const seatCat1 = await seatCat1Response.json();
+
+    const seatCat2Response = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 6,
+          endRow: 10,
+          price: 150,
+          seatsPerRow: 10,
+        },
+        param: { eventId: event.id },
+      },
+      { headers: { Cookie: cookie } },
+    );
+    const seatCat2 = await seatCat2Response.json();
+
+    const response = await client.api.tickets.admin.events[":eventId"][
+      "seat-categories"
+    ].$get(
+      {
+        param: { eventId: event.id },
+      },
+      { headers: { Cookie: cookie } },
+    );
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(Array.isArray(data)).toBe(true);
+    expect(data).toHaveLength(2);
+    expect(data.map((sc) => sc.id).sort()).toEqual(
+      [seatCat1.id, seatCat2.id].sort(),
+    );
+  });
+});
+
+describe("GET /api/tickets/events/:eventId/seat-categories", () => {
+  it("should throw 401 when not authenticated", async () => {
+    const response = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$get({
+      param: { eventId: uuidv7() },
+    });
+
+    expect(response.status).toBe(401);
+  });
+
+  it("should throw 400 when invalid event UUID is provided", async () => {
+    const cookie = await global.signin({ role: UserRoles.USER });
+
+    const response = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$get(
+      {
+        param: { eventId: "invalid-uuid" },
+      },
+      { headers: { Cookie: cookie } },
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it("should return 404 when event does not exist", async () => {
+    const cookie = await global.signin({ role: UserRoles.USER });
+
+    const response = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$get(
+      {
+        param: { eventId: uuidv7() },
+      },
+      { headers: { Cookie: cookie } },
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it("should return 404 when event is in draft mode", async () => {
+    const adminCookie = await global.signin({ role: UserRoles.ADMIN });
+    const userCookie = await global.signin({ role: UserRoles.USER });
+
+    const eventResponse = await client.api.tickets.events.$post(
+      {
+        json: {
+          title: "Draft event",
+          desc: "Test description",
+          date: new Date(new Date().getTime() + 3600 * 1000),
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+
+    const event = await eventResponse.json();
+
+    const response = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$get(
+      {
+        param: { eventId: event.id },
+      },
+      { headers: { Cookie: userCookie } },
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it("should return one seat category for published event", async () => {
+    const adminCookie = await global.signin({ role: UserRoles.ADMIN });
+    const userCookie = await global.signin({ role: UserRoles.USER });
+
+    const eventResponse = await client.api.tickets.events.$post(
+      {
+        json: {
+          title: "Published event without seat categories",
+          desc: "Test description",
+          date: new Date(new Date().getTime() + 3600 * 1000),
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+
+    const event = await eventResponse.json();
+
+    // Create and publish event (requires at least one seat category)
+    const seatCatResponse = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 5,
+          price: 100,
+          seatsPerRow: 10,
+        },
+        param: { eventId: event.id },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+    expect(seatCatResponse.status).toBe(201);
+
+    const publishResponse = await client.api.tickets.events[":eventId"][
+      "publish"
+    ].$post(
+      {
+        param: { eventId: event.id },
+        json: { currentVersion: event.version },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+    expect(publishResponse.status).toBe(200);
+
+    const response = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$get(
+      {
+        param: { eventId: event.id },
+      },
+      { headers: { Cookie: userCookie } },
+    );
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(Array.isArray(data)).toBe(true);
+    expect(data).toHaveLength(1);
+  });
+
+  it("should return seat categories for published event", async () => {
+    const adminCookie = await global.signin({ role: UserRoles.ADMIN });
+    const userCookie = await global.signin({ role: UserRoles.USER });
+
+    const eventResponse = await client.api.tickets.events.$post(
+      {
+        json: {
+          title: "Published event with seat categories",
+          desc: "Test description",
+          date: new Date(new Date().getTime() + 3600 * 1000),
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+
+    const event = await eventResponse.json();
+
+    // Create seat categories
+    const seatCat1Response = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 5,
+          price: 100,
+          seatsPerRow: 10,
+        },
+        param: { eventId: event.id },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+    expect(seatCat1Response.status).toBe(201);
+
+    const seatCat2Response = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 6,
+          endRow: 10,
+          price: 150,
+          seatsPerRow: 10,
+        },
+        param: { eventId: event.id },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+    expect(seatCat2Response.status).toBe(201);
+
+    // Publish event
+    const publishResponse = await client.api.tickets.events[":eventId"][
+      "publish"
+    ].$post(
+      {
+        param: { eventId: event.id },
+        json: { currentVersion: event.version },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+    expect(publishResponse.status).toBe(200);
+
+    // Get seat categories as authenticated user
+    const response = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$get(
+      {
+        param: { eventId: event.id },
+      },
+      { headers: { Cookie: userCookie } },
+    );
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(Array.isArray(data)).toBe(true);
+    expect(data).toHaveLength(2);
+  });
+});
+
+describe("GET /api/tickets/admin/seat-categories/:seatCategoryId/tickets", () => {
+  it("should throw 401 when not authenticated", async () => {
+    const response = await client.api.tickets.admin["seat-categories"][
+      ":seatCategoryId"
+    ].tickets.$get({
+      param: { seatCategoryId: uuidv7() },
+    });
+
+    expect(response.status).toBe(401);
+  });
+
+  it("should throw 403 when authenticated as non-admin user", async () => {
+    const cookie = await global.signin({ role: UserRoles.USER });
+
+    const response = await client.api.tickets.admin["seat-categories"][
+      ":seatCategoryId"
+    ].tickets.$get(
+      {
+        param: { seatCategoryId: uuidv7() },
+      },
+      { headers: { Cookie: cookie } },
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("should throw 400 when invalid seat category UUID is provided", async () => {
+    const cookie = await global.signin({ role: UserRoles.ADMIN });
+
+    const response = await client.api.tickets.admin["seat-categories"][
+      ":seatCategoryId"
+    ].tickets.$get(
+      {
+        param: { seatCategoryId: "invalid-uuid" },
+      },
+      { headers: { Cookie: cookie } },
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it("should return empty array when seat category exists but has no tickets", async () => {
+    const cookie = await global.signin({ role: UserRoles.ADMIN });
+
+    const response = await client.api.tickets.admin["seat-categories"][
+      ":seatCategoryId"
+    ].tickets.$get(
+      {
+        param: { seatCategoryId: uuidv7() },
+      },
+      { headers: { Cookie: cookie } },
+    );
+
+    // Will return 200 with empty array even if seat category doesn't exist
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(Array.isArray(data)).toBe(true);
+    expect(data).toHaveLength(0);
+  });
+
+  it("should return all tickets for a seat category", async () => {
+    const cookie = await global.signin({ role: UserRoles.ADMIN });
+
+    // Create event
+    const eventResponse = await client.api.tickets.events.$post(
+      {
+        json: {
+          title: "Test event",
+          desc: "Test description",
+          date: new Date(new Date().getTime() + 3600 * 1000),
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      { headers: { Cookie: cookie } },
+    );
+    const event = await eventResponse.json();
+
+    // Create seat category
+    const seatCatResponse = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 3,
+          price: 100,
+          seatsPerRow: 5,
+        },
+        param: { eventId: event.id },
+      },
+      { headers: { Cookie: cookie } },
+    );
+    const seatCat = await seatCatResponse.json();
+
+    // Get all tickets for this seat category
+    const response = await client.api.tickets.admin["seat-categories"][
+      ":seatCategoryId"
+    ].tickets.$get(
+      {
+        param: { seatCategoryId: seatCat.id },
+      },
+      { headers: { Cookie: cookie } },
+    );
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(Array.isArray(data)).toBe(true);
+    // 3 rows * 5 seats per row = 15 tickets
+    expect(data).toHaveLength(15);
+    expect(data.every((t) => t.seatCategoryId === seatCat.id)).toBe(true);
+  });
+
+  it("should return tickets with all properties", async () => {
+    const cookie = await global.signin({ role: UserRoles.ADMIN });
+
+    const eventResponse = await client.api.tickets.events.$post(
+      {
+        json: {
+          title: "Test event",
+          desc: "Test description",
+          date: new Date(new Date().getTime() + 3600 * 1000),
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      { headers: { Cookie: cookie } },
+    );
+    const event = await eventResponse.json();
+
+    const seatCatResponse = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 2,
+          price: 100,
+          seatsPerRow: 3,
+        },
+        param: { eventId: event.id },
+      },
+      { headers: { Cookie: cookie } },
+    );
+    const seatCat = await seatCatResponse.json();
+
+    const response = await client.api.tickets.admin["seat-categories"][
+      ":seatCategoryId"
+    ].tickets.$get(
+      {
+        param: { seatCategoryId: seatCat.id },
+      },
+      { headers: { Cookie: cookie } },
+    );
+
+    const data = await response.json();
+    expect(data.length).toBeGreaterThan(0);
+
+    data.forEach((ticket) => {
+      expect(ticket).toHaveProperty("id");
+      expect(ticket).toHaveProperty("seatCategoryId");
+      expect(ticket).toHaveProperty("row");
+      expect(ticket).toHaveProperty("seatNumber");
+      expect(typeof ticket.id).toBe("string");
+      expect(typeof ticket.row).toBe("number");
+      expect(typeof ticket.seatNumber).toBe("number");
+    });
+  });
+});
+
+describe("GET /api/tickets/seat-categories/:seatCategoryId/tickets", () => {
+  it("should throw 401 when not authenticated", async () => {
+    const response = await client.api.tickets["seat-categories"][
+      ":seatCategoryId"
+    ].tickets.$get({
+      param: { seatCategoryId: uuidv7() },
+    });
+
+    expect(response.status).toBe(401);
+  });
+
+  it("should throw 400 when invalid seat category UUID is provided", async () => {
+    const cookie = await global.signin({ role: UserRoles.USER });
+
+    const response = await client.api.tickets["seat-categories"][
+      ":seatCategoryId"
+    ].tickets.$get(
+      {
+        param: { seatCategoryId: "invalid-uuid" },
+      },
+      { headers: { Cookie: cookie } },
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it("should return 404 when no tickets found for seat category", async () => {
+    const cookie = await global.signin({ role: UserRoles.USER });
+
+    const response = await client.api.tickets["seat-categories"][
+      ":seatCategoryId"
+    ].tickets.$get(
+      {
+        param: { seatCategoryId: uuidv7() },
+      },
+      { headers: { Cookie: cookie } },
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it("should return 404 when event is in draft mode", async () => {
+    const adminCookie = await global.signin({ role: UserRoles.ADMIN });
+    const userCookie = await global.signin({ role: UserRoles.USER });
+
+    // Create event (draft by default)
+    const eventResponse = await client.api.tickets.events.$post(
+      {
+        json: {
+          title: "Draft event",
+          desc: "Test description",
+          date: new Date(new Date().getTime() + 3600 * 1000),
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+    const event = await eventResponse.json();
+
+    // Create seat category
+    const seatCatResponse = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 3,
+          price: 100,
+          seatsPerRow: 5,
+        },
+        param: { eventId: event.id },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+    const seatCat = await seatCatResponse.json();
+
+    // Try to get tickets as regular user (should fail because event is draft)
+    const response = await client.api.tickets["seat-categories"][
+      ":seatCategoryId"
+    ].tickets.$get(
+      {
+        param: { seatCategoryId: seatCat.id },
+      },
+      { headers: { Cookie: userCookie } },
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it("should return tickets with userId as boolean", async () => {
+    const adminCookie = await global.signin({ role: UserRoles.ADMIN });
+    const userCookie = await global.signin({ role: UserRoles.USER });
+
+    // Create event
+    const eventResponse = await client.api.tickets.events.$post(
+      {
+        json: {
+          title: "Published event",
+          desc: "Test description",
+          date: new Date(new Date().getTime() + 3600 * 1000),
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+    const event = await eventResponse.json();
+
+    // Create seat category
+    const seatCatResponse = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 2,
+          price: 100,
+          seatsPerRow: 3,
+        },
+        param: { eventId: event.id },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+    const seatCat = await seatCatResponse.json();
+
+    // Publish event
+    const publishResponse = await client.api.tickets.events[":eventId"][
+      "publish"
+    ].$post(
+      {
+        param: { eventId: event.id },
+        json: { currentVersion: event.version },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+    expect(publishResponse.status).toBe(200);
+
+    // Get tickets as regular user
+    const response = await client.api.tickets["seat-categories"][
+      ":seatCategoryId"
+    ].tickets.$get(
+      {
+        param: { seatCategoryId: seatCat.id },
+      },
+      { headers: { Cookie: userCookie } },
+    );
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(Array.isArray(data)).toBe(true);
+    expect(data).toHaveLength(6); // 2 rows * 3 seats
+
+    // Verify structure and userId is boolean
+    data.forEach((ticket) => {
+      expect(ticket).toHaveProperty("id");
+      expect(ticket).toHaveProperty("seatCategoryId");
+      expect(ticket).toHaveProperty("row");
+      expect(ticket).toHaveProperty("seatNumber");
+      expect(ticket).toHaveProperty("userId");
+      expect(typeof ticket.userId).toBe("boolean");
+      expect(ticket.userId).toBe(false); // Unbooked tickets have userId = null -> false
+    });
+  });
+
+  it("should show userId as true when ticket is booked", async () => {
+    const adminCookie = await global.signin({ role: UserRoles.ADMIN });
+    const userCookie = await global.signin({ role: UserRoles.USER });
+
+    // Create event
+    const eventResponse = await client.api.tickets.events.$post(
+      {
+        json: {
+          title: "Published event",
+          desc: "Test description",
+          date: new Date(new Date().getTime() + 3600 * 1000),
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+    const event = await eventResponse.json();
+
+    // Create seat category
+    const seatCatResponse = await client.api.tickets.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 1,
+          price: 100,
+          seatsPerRow: 2,
+        },
+        param: { eventId: event.id },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+    const seatCat = await seatCatResponse.json();
+
+    // Publish event
+    const publishResponse = await client.api.tickets.events[":eventId"][
+      "publish"
+    ].$post(
+      {
+        param: { eventId: event.id },
+        json: { currentVersion: event.version },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+    expect(publishResponse.status).toBe(200);
+
+    // Book one ticket by setting userId
+    const tickets = await db.query.ticketsTable.findMany({
+      where: (table, { eq }) => eq(table.seatCategoryId, seatCat.id),
+    });
+    const firstTicketId = tickets[0].id;
+
+    await db
+      .update(ticketsTable)
+      .set({ userId: uuidv7() })
+      .where(eq(ticketsTable.id, firstTicketId));
+
+    // Get tickets as regular user
+    const response = await client.api.tickets["seat-categories"][
+      ":seatCategoryId"
+    ].tickets.$get(
+      {
+        param: { seatCategoryId: seatCat.id },
+      },
+      { headers: { Cookie: userCookie } },
+    );
+
+    const data = await response.json();
+    expect(data).toHaveLength(2);
+
+    const bookedTicket = data.find((t) => t.id === firstTicketId);
+    const unbookedTicket = data.find((t) => t.id !== firstTicketId);
+
+    expect(bookedTicket?.userId).toBe(true);
+    expect(unbookedTicket?.userId).toBe(false);
   });
 });
