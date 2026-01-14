@@ -15,8 +15,8 @@
   - [x] add endpoint to update draft mode to false
   - [x] add versioning for updates in db
 - [x] update vitest config in auth
-- [ ] manually test flow till edit event + edit seat category + publish + try edit event + try edit seat category
-- [ ] update 409 errors (check PR)
+- [x] manually test flow till edit event + edit seat category + publish + try edit event + try edit seat category
+- [x] update 409 errors (check PR)
 - [ ] add cron to outbox
 
 ## Later
@@ -24,3 +24,4 @@
 - [x] error helper to make HTTP error payload same across the app
 - [ ] ack policy, retention etc
 - [ ] isolation levels for transactions
+- [ ] test coverage
