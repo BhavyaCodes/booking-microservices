@@ -1,0 +1,1 @@
+CREATE INDEX "ticket_ids_idx" ON "orders" USING gin ("ticket_ids");

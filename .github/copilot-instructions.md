@@ -2,51 +2,76 @@
 
 ## Architecture Overview
 
-This project is a **Bun monorepo** for a ticket booking platform with a microservices architecture. The main components include:
+**Bun monorepo** for a ticket booking platform with event-driven microservices:
 
-- **Auth Service**: Handles authentication using Google OAuth and JWT sessions stored in cookies. Located in `apps/auth/`.
-- **Tickets Service**: Manages ticket/event operations, utilizing PostgreSQL with Drizzle ORM. It implements an event-driven architecture using NATS JetStream. Located in `apps/tickets/`.
-- **Orders Service**: Processes orders based on ticket events. Currently in development. Located in `apps/orders/`.
-- **Client**: A Next.js frontend that integrates with the backend services. Located in `apps/client/`.
-- **Common Package**: Contains shared libraries, middlewares, and interfaces used across services. Located in `packages/common/`.
+- **Auth**: Google OAuth + JWT in cookies, MongoDB. Path: `apps/auth/`
+- **Tickets**: Event management, PostgreSQL + Drizzle ORM, publishes events via NATS. Path: `apps/tickets/`
+- **Orders**: Order processing from ticket events. Path: `apps/orders/`
+- **Client**: Next.js frontend. Path: `apps/client/`
+- **Common**: Shared middlewares, types, error handling. Path: `packages/common/`
 
-### Data Flow and Communication
+### Critical Data Flows
 
-- Services communicate asynchronously via **NATS JetStream**. The Tickets Service publishes events (e.g., `ticket.created`), which the Orders Service consumes.
-- Each service has its own database instance, with PostgreSQL for Tickets and Orders, and MongoDB for Auth.
+1. **Event Publishing (Tickets → Orders)**:
+   - Tickets Service uses **transactional outbox pattern** (`src/outbox/index.ts`)
+   - Changes to DB + outbox inserts happen in atomic transaction
+   - PostgreSQL NOTIFY triggers background `outboxPublisher()` to publish to NATS
+   - Orders Service listens to `Subjects.TicketsReserved` (see `packages/common/nats/events.ts`)
 
-## Developer Workflows
+2. **Authentication**: JWT token in `session` cookie, verified by `extractCurrentUser` middleware on all routes
 
-### Building and Running Services
+3. **Database per Service**: Auth (MongoDB), Tickets (PostgreSQL), Orders (PostgreSQL). No shared DBs.
 
-- Install dependencies from the root directory:
-  ```bash
-  bun install
-  ```
-- Start local development with Kubernetes:
-  ```bash
-  skaffold dev
-  ```
-  This command deploys all services and enables hot-reloading on file changes.
+## Essential Developer Workflows
+
+### Local Development (primary)
+
+```bash
+# Terminal 1: Deploy all services with hot-reload (requires Docker Desktop or Minikube)
+skaffold dev
+
+# Terminal 2 (optional): Debug logs
+kubectl logs -f deployment/{service}-depl
+```
 
 ### Testing
 
-- Run tests for each service:
-  ```bash
-  cd apps/tickets && bun test
-  ```
-  Ensure to start the PostgreSQL container for the Tickets service tests:
-  ```bash
-  docker compose -f postgres-test.docker-compose.yml up
-  ```
+**Important**: Database containers do NOT auto-start. Start manually before running tests.
+
+```bash
+# Auth Service (uses MongoMemoryServer - no external deps)
+cd apps/auth && bun test
+
+# Tickets Service (requires Postgres)
+cd apps/tickets
+docker compose -f postgres-test.docker-compose.yml up  # Terminal 1
+bun test  # Terminal 2
+
+# Orders Service (similar setup)
+cd apps/orders
+docker compose -f postgres-test.docker-compose.yml up
+bun test
+```
 
 ### Database Migrations
 
-- For the Tickets and Orders services, run migrations using Drizzle:
-  ```bash
-  cd apps/tickets
-  bun run drizzle-kit:migrate-dev
-  ```
+```bash
+cd apps/tickets
+
+# Generate migration from schema.ts changes
+bun run drizzle-kit:generate-dev
+
+# Apply to dev environment
+bun run drizzle-kit:migrate-dev
+
+# In Kubernetes: migrations auto-run via Jobs before service startup (see infra/k8s/*-migration-job.yaml)
+```
+
+### Install Dependencies
+
+```bash
+bun install  # From root directory
+```
 
 ## Project-Specific Conventions
 
@@ -54,92 +79,50 @@ This project is a **Bun monorepo** for a ticket booking platform with a microser
 - **Validation**: Use Zod for request validation with the `zValidator` middleware to ensure consistent error handling.
 - **Error Handling**: Use `HTTPException` and `CustomErrorResponse` for structured error responses.
 
-## Integration Points
-
-- **NATS Integration**: Set up NATS connection in `src/nats-wrapper.ts`. Use the `natsWrapper` to publish and subscribe to events.
-- **Outbox Pattern**: Implement the transactional outbox pattern in `src/outbox/index.ts` to ensure event publishing is atomic with database changes.
-
-## Key Files and Directories
-
-- **Auth Service**: [apps/auth/src/app.ts](apps/auth/src/app.ts)
-- **Tickets Service**: [apps/tickets/src/app.ts](apps/tickets/src/app.ts), [apps/tickets/src/db/schema.ts](apps/tickets/src/db/schema.ts)
-- **Outbox Implementation**: [apps/tickets/src/outbox/index.ts](apps/tickets/src/outbox/index.ts)
-- **NATS Wrapper**: [apps/tickets/src/nats-wrapper.ts](apps/tickets/src/nats-wrapper.ts)
-- **Testing Setup**: [apps/tickets/src/vitest-setup.ts](apps/tickets/src/vitest-setup.ts)
-
----
-
-This document serves as a guide for AI coding agents to navigate and understand the Booking Microservices codebase effectively.bun install
-
-# Local development with Kubernetes (primary workflow)
-
-skaffold dev # Deploys all services, hot-reloads on save # Requires local k8s (Docker Desktop/minikube)
-
-# Run tests (per-service, from service directory)
-
-cd apps/auth && bun test # Uses MongoMemoryServer (no external deps)
-cd apps/tickets && bun test # Requires: docker compose -f postgres-test.docker-compose.yml up
-
-# Database migrations (tickets/orders services)
-
-cd apps/tickets
-bun run drizzle-kit:generate-dev # Generate migration from schema changes
-bun run drizzle-kit:migrate-dev # Apply migrations (dev env)
-
-# In k8s, migrations run via Jobs before service starts (see tickets-migration-job.yaml)
-
-````
-
-**Important**: Tests don't auto-start containers. For Postgres-based services, manually run `docker compose -f postgres-test.docker-compose.yml up` before testing.
-
 ## Code Patterns
 
 ### Hono App Setup
 
-All services use method chaining for type-safe route inference. Always start with middleware stack:
+All services use method chaining for type-safe RPC-style routes. **CRITICAL**: `extractCurrentUser` must run on ALL routes (even public ones) to populate `c.get('currentUser')` when authenticated. It never throws—sets undefined if no valid token.
 
 ```typescript
 // See apps/tickets/src/app.ts
 const app = new Hono<{ Variables: { currentUser: CurrentUser } }>()
-  .use(logger())                    // Pino logger (configured via pl export)
-  .use(extractCurrentUser)          // ALWAYS first - extracts JWT from cookie
-  .get("/api/tickets", (c) => ...)  // Chain routes for RPC-style client
-  .post("/api/tickets/events", requireAdmin, zValidator(...), handler)
-````
+  .use(logger())                    // Pino logger
+  .use(extractCurrentUser)          // ALWAYS first—extracts JWT from cookie
+  .get("/api/tickets", (c) => ...)  // Public: currentUser may be undefined
+  .post("/api/tickets/admin/events", requireAdmin, zValidator(...), handler) // Admin-only
+```
 
-**Critical**: `extractCurrentUser` must run on ALL routes (even public ones) to populate `c.get('currentUser')` when authenticated. It never throws - just sets undefined if no valid token.
-
-### Route Protection Layers
+### Route Protection Pattern
 
 ```typescript
 import { extractCurrentUser, requireAuth, requireAdmin } from "@booking/common/middlewares";
 
-// Public route - currentUser available but optional
+// Middleware flow: extractCurrentUser (sets or undefined) → requireAuth (throws 401) → requireAdmin (throws 403)
+
 .get("/api/tickets", (c) => {
   const user = c.get('currentUser'); // May be undefined
 })
 
-// Authenticated route - requires valid JWT
 .get("/api/tickets/:id", requireAuth, (c) => {
-  const user = c.get('currentUser')!; // Guaranteed to exist
+  const user = c.get('currentUser')!; // Guaranteed to exist (401 if not)
 })
 
-// Admin-only route - checks user.role === UserRoles.ADMIN
-.post("/api/tickets/events", requireAdmin, (c) => {
-  const user = c.get('currentUser')!; // Guaranteed admin
+.post("/api/tickets/admin/events", requireAdmin, (c) => {
+  const user = c.get('currentUser')!; // Guaranteed admin (403 if not)
 })
 ```
 
-**Middleware Flow**: `extractCurrentUser` (sets currentUser or undefined) → `requireAuth` (throws 401 if undefined) → `requireAdmin` (throws 403 if not admin).
+### Validation & Error Handling
 
-### Validation Pattern
-
-**Always** use Zod with the shared `zodValidationHook` to ensure consistent error responses:
+**Always** use Zod + `zodValidationHook` for consistent error responses:
 
 ```typescript
 import { zValidator } from "@hono/zod-validator";
 import { zodValidationHook } from "@booking/common";
 import { z } from "zod";
+import { CustomErrorResponse, ErrorCodes, HTTPException } from "@booking/common";
 
 .post("/route",
   zValidator("json", z.object({
@@ -147,80 +130,35 @@ import { z } from "zod";
     date: z.coerce.date().refine((d) => d >= new Date(), {
       message: "Date must not be in the past"
     }),
-  }), zodValidationHook),  // Hook formats errors as CustomErrorResponse
+  }), zodValidationHook),  // Formats errors as CustomErrorResponse
   async (c) => {
-    const validated = c.req.valid("json"); // Type-safe validated data
+    const validated = c.req.valid("json");
+
+    // Throw semantic errors
+    if (someCondition) {
+      throw new HTTPException(400, {
+        res: new CustomErrorResponse({
+          message: "Ticket already reserved",
+          code: ErrorCodes.VALIDATION_FAILED, // Use enum, never raw strings
+        }),
+      });
+    }
   }
 )
 ```
 
-The `zodValidationHook` transforms Zod errors into `CustomErrorResponse` with code `VALIDATION_FAILED`.
+**Never throw raw `Error` objects.** Always use `HTTPException` + `CustomErrorResponse`.
 
-### Error Handling Pattern
+### Event Publishing – Transactional Outbox Pattern
 
-Use `HTTPException` + `CustomErrorResponse` (both re-exported from `@booking/common`):
+**Why**: Ensures atomic DB changes + event publishing. Single point of failure = no events, not split state.
 
-```typescript
-import {
-  CustomErrorResponse,
-  ErrorCodes,
-  HTTPException,
-} from "@booking/common";
+**Implementation** (see [apps/tickets/src/outbox/index.ts](apps/tickets/src/outbox/index.ts)):
 
-// Throw semantic errors with codes
-throw new HTTPException(400, {
-  res: new CustomErrorResponse({
-    message: "Ticket already reserved",
-    code: ErrorCodes.VALIDATION_FAILED, // Or UNAUTHORIZED, FORBIDDEN, etc.
-  }),
-});
-
-// Frontend receives: { "error": { "message": "...", "code": "VALIDATION_FAILED" } }
-```
-
-**Never** throw raw `Error` objects - always wrap in `HTTPException`. ErrorCodes enum defined in `@booking/common/error`.
-
-### Database Patterns
-
-**Auth Service** (Mongoose):
-
-```typescript
-// See apps/auth/src/models/user.ts
-// Use static build() method instead of new User()
-const user = User.build({ email, picture });
-await user.save();
-```
-
-**Tickets/Orders Services** (Drizzle + PostgreSQL):
-
-```typescript
-// See apps/tickets/src/db/schema.ts
-// UUIDv7 primary keys (time-sortable, better than v4)
-export const ticketsTable = pgTable("tickets", {
-  id: uuid().primaryKey().default(sql`uuidv7()`),  // Requires pg extension
-  ...
-});
-
-// Connection strings: see apps/tickets/src/db/index.ts
-// Test env uses hardcoded localhost:5432, prod uses {SERVICE}_POSTGRES_* env vars
-```
-
-**Critical**: Export `TicketsTxn` type for transaction callbacks:
-
-```typescript
-export type TicketsTxn = Parameters<Parameters<typeof db.transaction>[0]>[0];
-```
-
-### Event Publishing - Transactional Outbox Pattern
-
-**Why**: Ensures event publishing is atomic with DB changes. See [apps/tickets/src/outbox/index.ts](apps/tickets/src/outbox/index.ts).
-
-**Implementation Steps**:
-
-1. Within DB transaction, insert event row to `outboxTable` (not published yet)
-2. PostgreSQL trigger sends NOTIFY on insert (see migration)
-3. Service listens for NOTIFY, triggers `outboxPublisher()` background job
-4. Job SELECT FOR UPDATE SKIP LOCKED (up to 25 events), publishes to NATS, marks processed
+1. Within DB transaction, insert event row to `outboxTable` (not yet published)
+2. PostgreSQL trigger sends NOTIFY on insert
+3. Service LISTEN handler triggers `outboxPublisher()` background job
+4. Job: SELECT FOR UPDATE SKIP LOCKED (batch up to 25 events) → publish to NATS → mark processed
 
 **Usage in routes**:
 
@@ -230,88 +168,119 @@ import { addEventToOutBox } from "./outbox";
 await db.transaction(async (tx) => {
   const [ticket] = await tx.insert(ticketsTable).values(...).returning();
 
-  // Add event to outbox (published later by background job)
-  // Note: data is typically an array for batch publishing
+  // Add to outbox (published later by background worker)
   await addEventToOutBox(tx, {
-    subject: Subjects.TicketsCreated,
-    data: [{ id: ticket.id, price: ticket.price, seatCategoryId: ticket.seatCategoryId, date: ticket.date.toISOString() }]
+    subject: Subjects.TicketsReserved,
+    data: { ticketIds: [ticket.id], userId: user.id, amount: 100, expiresAt: new Date().toISOString() }
   });
 });
 ```
 
-**Event Types**: Defined in [packages/common/nats/events.ts](packages/common/nats/events.ts). When adding new events:
+**Event Types**: Define in [packages/common/nats/events.ts](packages/common/nats/events.ts):
 
-- Export type `YourNewEvent = { subject: Subjects.YourEvent; data: YourDataType[] | YourDataType }`
-- Add to `NATSEvent` union type: `export type NATSEvent = TicketCreatedEvent | YourNewEvent`
+```typescript
+export type YourEvent = {
+  subject: Subjects.YourSubject;
+  data: {
+    /* structured data */
+  }; // Object payload for this event type
+};
+
+export type NATSEvent = YourEvent | OtherEvent; // Add to union
+```
+
+### Database Patterns
+
+**Auth Service** (Mongoose):
+
+```typescript
+// See apps/auth/src/models/user.ts
+const user = User.build({ email, picture });
+await user.save();
+```
+
+**Tickets/Orders Services** (Drizzle + PostgreSQL):
+
+```typescript
+// UUIDv7 primary keys (time-sortable, better than v4)
+export const ticketsTable = pgTable("tickets", {
+  id: uuid()
+    .primaryKey()
+    .default(sql`uuidv7()`), // Requires pg extension
+  createdAt: timestamp().defaultNow(),
+  // ...
+});
+
+// Export transaction type for type-safe callbacks
+export type TicketsTxn = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+// Connection strings:
+// Dev: uses hardcoded localhost:5432 (see src/db/index.ts)
+// Prod: uses {SERVICE}_POSTGRES_* env vars
+```
 
 ### NATS Integration
 
-**Connection Setup** (see [apps/tickets/src/index.ts](apps/tickets/src/index.ts)):
+**Connection** (in `index.ts`):
 
 ```typescript
-import { natsWrapper } from "./nats-wrapper";
-
 await natsWrapper.connect("nats://nats-jetstream-srv:4222");
-// natsWrapper.nc - NATS connection
-// natsWrapper.js - JetStream client
+// natsWrapper.nc = NATS client
+// natsWrapper.js = JetStream client
 ```
 
-**Publishing** (via outbox - see above).
+**Publishing**: Via outbox pattern (see above—never direct publish).
 
 **Consuming** (extend BaseListener):
 
 ```typescript
-// See packages/common/nats/base-listener.ts
 import { BaseListener } from "@booking/common";
+import type { TicketsReservedEvent } from "@booking/common/nats/events";
+import { Subjects } from "@booking/common";
 
-export class TicketCreatedListener extends BaseListener<TicketCreatedEvent> {
-  subject = Subjects.TicketsCreated;
-  stream = "tickets-stream"; // Must match k8s stream config
+export class TicketsReservedListener extends BaseListener<TicketsReservedEvent> {
+  subject = Subjects.TicketsReserved;
+  stream = "booking"; // Must match k8s JetStream stream config
 
   async onMessage(msg: JsMsg) {
     const data = JSON.parse(msg.data as string);
     // Process event...
-    msg.ack(); // Manual ack required
+    msg.ack(); // Manual ack required (important!)
   }
 }
 
-// Start listener in index.ts
-new TicketCreatedListener(natsWrapper.js).listen();
+// Start in index.ts
+new TicketsReservedListener(natsWrapper.js).listen();
 ```
-
-**Orders Service Note**: Event listener code is commented out (see [apps/orders/src/index.ts](apps/orders/src/index.ts)) - uncomment when ready to consume events.
 
 ### Logging Pattern
 
-All services use Pino logger with identical config:
+All services use Pino with identical config:
 
 ```typescript
-// See apps/tickets/src/logger.ts
 import { pl } from "./logger"; // "pl" = pino logger
 
 pl.trace("Debug details");
 pl.info("Normal operation");
 pl.error({ err, context }, "Error message");
-pl.fatal(err, "Unrecoverable error"); // Logs then exits
+pl.fatal(err, "Unrecoverable error"); // Logs then exits with code 1
 ```
 
-**Convention**: Always use `pl` export name for consistency. Use structured logging (pass objects before message).
+Convention: Always export as `pl` for consistency. Use structured logging (pass objects before message).
 
 ### Service Bootstrap Pattern
 
-Every service's `index.ts` follows this structure (see [apps/tickets/src/index.ts](apps/tickets/src/index.ts)):
+Every service's `index.ts` follows this order:
 
-1. Validate required env vars (throw early if missing)
-2. Connect to NATS JetStream
-3. Start event listeners (if consuming events)
-4. Connect to database (Postgres/Mongo)
-5. Set up PostgreSQL LISTEN for outbox notifications (Postgres services only)
+1. Validate required env vars (throw early)
+2. Connect to NATS JetStream (skip for Auth)
+3. Start event listeners if consuming (skip for Auth, commented for Orders)
+4. Connect to database
+5. **For Postgres services**: Set up PostgreSQL LISTEN/NOTIFY for outbox
 6. Start Bun server on port 3000
-7. Register cleanup handlers (SIGINT/SIGTERM) - drain NATS, release DB connections
+7. Register SIGINT/SIGTERM cleanup handlers (drain NATS, release DB pools)
 
-**Auth Service**: MongoDB, no NATS listeners, simple startup.
-**Tickets Service**: PostgreSQL with outbox pattern, LISTEN/NOTIFY setup required.
-**Orders Service**: PostgreSQL setup done, but event listeners are commented out (uncomment when implementing order consumption).
+See [apps/tickets/src/index.ts](apps/tickets/src/index.ts) for full example.
 
 ## Testing Conventions
 
@@ -341,7 +310,7 @@ const client = testClient(app);
 it("should create event as admin", async () => {
   const cookie = await global.signin({ role: UserRoles.ADMIN });
 
-  const res = await client.api.tickets.events.$post(
+  const res = await client.api.tickets.admin.events.$post(
     {
       json: {
         title: "Test Event",
@@ -358,7 +327,7 @@ it("should create event as admin", async () => {
 it("should return 403 for non-admin users", async () => {
   const cookie = await global.signin({ role: UserRoles.USER });
 
-  const res = await client.api.tickets.events.$post(
+  const res = await client.api.tickets.admin.events.$post(
     {
       json: {
         title: "Test",
@@ -393,10 +362,10 @@ Use `testClient` for type-safe RPC-style calls with autocomplete for routes and 
 ## Naming Conventions
 
 - **Package names**: `@booking/{service}` (workspace protocol: `@booking/common@workspace:*`)
-- **API routes**: `/api/{service}/...` (e.g., `/api/auth/google-callback`, `/api/tickets/events`)
+- **API routes**: `/api/{service}/...` (e.g., `/api/auth/google-callback`, `/api/tickets/admin/events`)
 - **K8s services**: `{service}-srv` or `{service}-{db}-srv` (e.g., `tickets-srv`, `tickets-postgres-srv`)
 - **K8s deployments**: `{service}-depl` (e.g., `auth-depl`)
-- **NATS subjects**: `{service}.{action}` (e.g., `tickets.created`)
+- **NATS subjects**: `{service}.{action}` (e.g., `tickets.reserved`)
 - **NATS streams**: `{service}-stream` (configured via k8s Job applying nats-jetstream-stream-config.yaml)
 - **Environment variables**: `{SERVICE}_{COMPONENT}_{VAR}` (e.g., `TICKETS_POSTGRES_PASSWORD`)
 

@@ -25,3 +25,6 @@
 - [ ] ack policy, retention etc
 - [ ] isolation levels for transactions
 - [ ] test coverage
+- [ ] Reliability config & error handling
+  - [ ] handle NODE_ENV -> CI
+  - [ ] Implement msg.term() handling in tickets-reserved-listener.ts (see TODO at line 51) and design dead letter queue

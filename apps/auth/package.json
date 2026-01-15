@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "bun run --hot src/index.ts",
     "start": "bun run src/index.ts",
-    "test": "vitest"
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "exports": {
     "./client": {
