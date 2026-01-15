@@ -10,7 +10,18 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db } from "./db";
 import { eventsTable, seatCategoriesTable, ticketsTable } from "./db/schema";
-import { and, count, eq, ne, or, lt, gt, isNotNull } from "drizzle-orm";
+import {
+  and,
+  count,
+  eq,
+  ne,
+  or,
+  lt,
+  gt,
+  isNotNull,
+  isNull,
+  inArray,
+} from "drizzle-orm";
 import {
   CustomErrorResponse,
   ErrorCodes,
@@ -22,6 +33,8 @@ import {
 import { addEventToOutBox } from "./outbox";
 import { logger } from "hono/logger";
 import { pl } from "./logger";
+
+const EXPIRY_TIME_MINUTES = 15;
 
 const app = new Hono<{
   Variables: {
@@ -35,7 +48,7 @@ const app = new Hono<{
   })
   // events routes
   .post(
-    "/api/tickets/events",
+    "/api/tickets/admin/events",
     requireAdmin,
     zValidator(
       "json",
@@ -65,7 +78,7 @@ const app = new Hono<{
     },
   )
   .patch(
-    "/api/tickets/events/:eventId",
+    "/api/tickets/admin/events/:eventId",
     requireAdmin,
     zValidator("param", z.object({ eventId: z.uuid() }), zodValidationHook),
     zValidator(
@@ -157,7 +170,7 @@ const app = new Hono<{
     },
   )
   .post(
-    "/api/tickets/events/:eventId/publish",
+    "/api/tickets/admin/events/:eventId/publish",
     requireAdmin,
     zValidator("param", z.object({ eventId: z.uuid() }), zodValidationHook),
     zValidator(
@@ -245,7 +258,7 @@ const app = new Hono<{
   )
   // seat categories routes
   .post(
-    "/api/tickets/events/:eventId/seat-categories",
+    "/api/tickets/admin/events/:eventId/seat-categories",
     requireAdmin,
     zValidator("param", z.object({ eventId: z.uuid() }), zodValidationHook),
     zValidator(
@@ -385,7 +398,7 @@ const app = new Hono<{
     },
   )
   .patch(
-    "/api/tickets/seat-categories/:id",
+    "/api/tickets/admin/seat-categories/:id",
     requireAdmin,
     zValidator("param", z.object({ id: z.uuid() }), zodValidationHook),
     zValidator(
@@ -785,8 +798,139 @@ const app = new Hono<{
       return c.json(response, 200);
     },
   )
+  .post(
+    "/api/tickets/seat-categories/:seatCategoryId/tickets/reserve",
+    requireAuth,
+    zValidator(
+      "param",
+      z.object({ seatCategoryId: z.uuid() }),
+      zodValidationHook,
+    ),
+    zValidator(
+      "json",
+      z.object({
+        ticketIds: z.array(z.uuid()).min(1).max(10),
+      }),
+      zodValidationHook,
+    ),
+    async (c) => {
+      const { seatCategoryId } = c.req.param();
+      const { ticketIds } = c.req.valid("json");
+      const userId = c.get("currentUser").id;
+
+      try {
+        const reservedTickets = await db.transaction(async (tx) => {
+          // lock the tickets to be reserved
+          const lockedTickets = await tx
+            .select()
+            .from(ticketsTable)
+            .where(
+              and(
+                eq(ticketsTable.seatCategoryId, seatCategoryId),
+                inArray(ticketsTable.id, ticketIds),
+                isNull(ticketsTable.userId),
+              ),
+            )
+            .for("update");
+
+          if (lockedTickets.length !== ticketIds.length) {
+            throw new HTTPException(400, {
+              res: new CustomErrorResponse({
+                message:
+                  "Some tickets are already reserved or do not exist in the specified seat category",
+              }),
+            });
+          }
+
+          const seatCategoryWithEvent = await tx
+            .select()
+            .from(seatCategoriesTable)
+            .where(eq(seatCategoriesTable.id, seatCategoryId))
+            .innerJoin(
+              eventsTable,
+              eq(seatCategoriesTable.eventId, eventsTable.id),
+            )
+            .limit(1)
+            .for("update");
+
+          if (seatCategoryWithEvent.length === 0) {
+            throw new HTTPException(404, {
+              res: new CustomErrorResponse({
+                message: "Seat category not found",
+              }),
+            });
+          }
+
+          const linkedEvent = seatCategoryWithEvent[0].events;
+
+          if (linkedEvent.draft) {
+            throw new HTTPException(400, {
+              res: new CustomErrorResponse({
+                message: "Event is not published",
+              }),
+            });
+          }
+
+          if (linkedEvent.date < new Date()) {
+            throw new HTTPException(400, {
+              res: new CustomErrorResponse({
+                message: "Cannot reserve tickets for past events",
+              }),
+            });
+          }
+
+          const ticketsToReserve = await tx
+            .update(ticketsTable)
+            .set({
+              userId,
+            })
+            .where(
+              and(
+                eq(ticketsTable.seatCategoryId, seatCategoryId),
+                inArray(ticketsTable.id, ticketIds),
+                isNull(ticketsTable.userId),
+              ),
+            )
+            .returning();
+
+          if (ticketsToReserve.length !== lockedTickets.length) {
+            // If update touched fewer rows than we locked, treat as failure
+            pl.error(c, "Failed to reserve tickets");
+            throw new HTTPException(500, {
+              res: new CustomErrorResponse({
+                message: "Failed to reserve tickets",
+              }),
+            });
+          }
+
+          await addEventToOutBox(tx, {
+            subject: Subjects.TicketsReserved,
+            data: {
+              ticketIds,
+              userId,
+              amount:
+                ticketsToReserve.length *
+                seatCategoryWithEvent[0].seat_categories.price,
+              expiresAt: new Date(
+                Date.now() + EXPIRY_TIME_MINUTES * 60 * 1000,
+              ).toISOString(),
+            },
+          });
+
+          return ticketsToReserve;
+        });
+
+        return c.json(reservedTickets, 200);
+      } catch (error) {
+        if (!(error instanceof HTTPException)) {
+          pl.error({ error }, "Error reserving tickets");
+        }
+        throw error;
+      }
+    },
+  )
   // admin route to get counts of events, seat categories and tickets
-  .get("/api/tickets/db-info", requireAdmin, async (c) => {
+  .get("/api/tickets/admin/db-info", requireAdmin, async (c) => {
     const eventsCount = await db.select({ count: count() }).from(eventsTable);
     const seatCategoriesCount = await db
       .select({ count: count() })
