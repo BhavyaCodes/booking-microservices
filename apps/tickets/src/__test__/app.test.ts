@@ -3382,9 +3382,6 @@ describe("POST /api/tickets/seat-categories/:seatCategoryId/tickets/reserve", ()
     );
 
     expect(reserveResponse2.status).toBe(400);
-    const reservedTickets2 = await reserveResponse2.json();
-
-    // expect(reservedTickets2).toHaveLength(0); // No tickets should be reserved
   });
 
   it("should return 400 when no ticket IDs are provided", async () => {
