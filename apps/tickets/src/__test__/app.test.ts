@@ -3040,7 +3040,7 @@ describe("GET /api/tickets/seat-categories/:seatCategoryId/tickets", () => {
 });
 
 describe("POST /api/tickets/seat-categories/:seatCategoryId/tickets/reserve", () => {
-  it("should throw 404 if seat category does not exist", async () => {
+  it("should throw 400 if seat category does not exist", async () => {
     const cookie = await global.signin({ role: UserRoles.USER });
 
     const response = await client.api.tickets["seat-categories"][
@@ -3055,7 +3055,7 @@ describe("POST /api/tickets/seat-categories/:seatCategoryId/tickets/reserve", ()
       { headers: { Cookie: cookie } },
     );
 
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(400);
   });
 
   it("should throw 400 if event is in draft mode", async () => {
@@ -3180,14 +3180,117 @@ describe("POST /api/tickets/seat-categories/:seatCategoryId/tickets/reserve", ()
       },
       { headers: { Cookie: userCookie } },
     );
+    const reservedTickets = await reserveResponse.json();
+    console.log("🚀 ~ reservedTickets:", reservedTickets);
 
     expect(reserveResponse.status).toBe(200);
-    const reservedTickets = await reserveResponse.json();
     expect(reservedTickets).toHaveLength(2);
     reservedTickets.forEach((t: any) => {
       expect(ticketIdsToReserve).toContain(t.id);
       expect(t.userId).toBeDefined();
     });
+  });
+
+  it("should call addEventToOutBox when tickets are reserved", async () => {
+    const outboxSpy = vi.spyOn(outbox, "addEventToOutBox");
+
+    const adminCookie = await global.signin({ role: UserRoles.ADMIN });
+    const userId = uuidv7();
+    const userCookie = await global.signin({
+      role: UserRoles.USER,
+      id: userId,
+    });
+
+    // Create event
+    const eventResponse = await client.api.tickets.admin.events.$post(
+      {
+        json: {
+          title: "Published event",
+          desc: "Test description",
+          date: new Date(new Date().getTime() + 3600 * 1000),
+          imageUrl: "https://example.com/image.jpg",
+        },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+    const event = await eventResponse.json();
+
+    // Create seat category
+    const seatCatResponse = await client.api.tickets.admin.events[":eventId"][
+      "seat-categories"
+    ].$post(
+      {
+        json: {
+          startRow: 1,
+          endRow: 1,
+          price: 120,
+          seatsPerRow: 3,
+        },
+        param: { eventId: event.id },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+    const seatCat = await seatCatResponse.json();
+
+    // Publish event
+    const publishResponse = await client.api.tickets.admin.events[":eventId"][
+      "publish"
+    ].$post(
+      {
+        param: { eventId: event.id },
+        json: { currentVersion: event.version },
+      },
+      { headers: { Cookie: adminCookie } },
+    );
+    expect(publishResponse.status).toBe(200);
+
+    // Get tickets for the seat category
+    const ticketsResponse = await client.api.tickets["seat-categories"][
+      ":seatCategoryId"
+    ].tickets.$get(
+      {
+        param: { seatCategoryId: seatCat.id },
+      },
+      { headers: { Cookie: userCookie } },
+    );
+    const tickets = await ticketsResponse.json();
+    const ticketIdsToReserve = tickets.slice(0, 2).map((t: any) => t.id);
+
+    // Clear prior outbox calls (seat-category creation publishes tickets.created)
+    outboxSpy.mockClear();
+
+    // Reserve tickets
+    const reserveResponse = await client.api.tickets["seat-categories"][
+      ":seatCategoryId"
+    ].tickets.reserve.$post(
+      {
+        param: { seatCategoryId: seatCat.id },
+        json: {
+          ticketIds: ticketIdsToReserve,
+        },
+      },
+      { headers: { Cookie: userCookie } },
+    );
+
+    expect(reserveResponse.status).toBe(200);
+    expect(outboxSpy).toHaveBeenCalledTimes(1);
+
+    const [, eventArg] = outboxSpy.mock.calls[0];
+    expect(eventArg).toEqual(
+      expect.objectContaining({
+        subject: Subjects.TicketsReserved,
+        data: expect.objectContaining({
+          ticketIds: ticketIdsToReserve,
+          userId,
+          amount: 120 * ticketIdsToReserve.length,
+          expiresAt: expect.stringMatching(
+            /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
+          ),
+        }),
+      }),
+    );
+
+    outboxSpy.mockRestore();
   });
 
   it("should not reserve already booked tickets", async () => {
