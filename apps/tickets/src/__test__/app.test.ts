@@ -3181,7 +3181,6 @@ describe("POST /api/tickets/seat-categories/:seatCategoryId/tickets/reserve", ()
       { headers: { Cookie: userCookie } },
     );
     const reservedTickets = await reserveResponse.json();
-    console.log("🚀 ~ reservedTickets:", reservedTickets);
 
     expect(reserveResponse.status).toBe(200);
     expect(reservedTickets).toHaveLength(2);
