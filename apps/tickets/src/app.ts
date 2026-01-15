@@ -818,8 +818,6 @@ const app = new Hono<{
       const { ticketIds } = c.req.valid("json");
       const userId = c.get("currentUser").id;
 
-      // check if event is published and date is in future
-
       try {
         const reservedTickets = await db.transaction(async (tx) => {
           // lock the tickets to be reserved
