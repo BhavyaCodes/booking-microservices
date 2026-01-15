@@ -22,6 +22,13 @@
       "when": 1768501093936,
       "tag": "0002_puzzling_logan",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1768508740451,
+      "tag": "0003_violet_thunderbolts",
+      "breakpoints": true
     }
   ]
 }
