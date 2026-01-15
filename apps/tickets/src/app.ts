@@ -362,24 +362,7 @@ const app = new Hono<{
             }
           }
 
-          const tickets = await tx
-            .insert(ticketsTable)
-            .values(newTickets)
-            .returning();
-
-          // const eventData: TicketCreatedEvent["data"] = tickets.map(
-          //   (ticket) => ({
-          //     id: ticket.id,
-          //     price: price,
-          //     seatCategoryId: ticket.seatCategoryId,
-          //     date: event.date.toISOString(),
-          //   }),
-          // );
-
-          // await addEventToOutBox(tx, {
-          //   subject: Subjects.TicketsCreated,
-          //   data: eventData,
-          // });
+          await tx.insert(ticketsTable).values(newTickets);
 
           return newSeatCategory[0];
         } catch (error) {
