@@ -15,6 +15,13 @@
       "when": 1767903185513,
       "tag": "0001_moaning_cargill",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1768501093936,
+      "tag": "0002_puzzling_logan",
+      "breakpoints": true
     }
   ]
 }
