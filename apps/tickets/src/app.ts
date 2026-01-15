@@ -27,7 +27,6 @@ import {
   ErrorCodes,
   HTTPException,
   Subjects,
-  TicketCreatedEvent,
   zodValidationHook,
 } from "@booking/common";
 import { addEventToOutBox } from "./outbox";
@@ -368,19 +367,19 @@ const app = new Hono<{
             .values(newTickets)
             .returning();
 
-          const eventData: TicketCreatedEvent["data"] = tickets.map(
-            (ticket) => ({
-              id: ticket.id,
-              price: price,
-              seatCategoryId: ticket.seatCategoryId,
-              date: event.date.toISOString(),
-            }),
-          );
+          // const eventData: TicketCreatedEvent["data"] = tickets.map(
+          //   (ticket) => ({
+          //     id: ticket.id,
+          //     price: price,
+          //     seatCategoryId: ticket.seatCategoryId,
+          //     date: event.date.toISOString(),
+          //   }),
+          // );
 
-          await addEventToOutBox(tx, {
-            subject: Subjects.TicketsCreated,
-            data: eventData,
-          });
+          // await addEventToOutBox(tx, {
+          //   subject: Subjects.TicketsCreated,
+          //   data: eventData,
+          // });
 
           return newSeatCategory[0];
         } catch (error) {
