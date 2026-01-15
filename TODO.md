@@ -26,3 +26,4 @@
 - [ ] isolation levels for transactions
 - [ ] test coverage
 - [ ] handle NODE_ENV -> CI
+- [ ] Dead letter queue and use of msg.term()

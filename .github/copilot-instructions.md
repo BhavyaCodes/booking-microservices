@@ -183,7 +183,7 @@ export type YourEvent = {
   subject: Subjects.YourSubject;
   data: {
     /* structured data */
-  }; // Can be object or array
+  }; // Object payload for this event type
 };
 
 export type NATSEvent = YourEvent | OtherEvent; // Add to union
@@ -240,7 +240,7 @@ import { Subjects } from "@booking/common";
 
 export class TicketsReservedListener extends BaseListener<TicketsReservedEvent> {
   subject = Subjects.TicketsReserved;
-  stream = "tickets-stream"; // Must match k8s JetStream stream config
+  stream = "booking"; // Must match k8s JetStream stream config
 
   async onMessage(msg: JsMsg) {
     const data = JSON.parse(msg.data as string);
