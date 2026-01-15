@@ -895,7 +895,8 @@ const app = new Hono<{
             )
             .returning();
 
-          if (ticketsToReserve.length === lockedTickets.length) {
+          if (ticketsToReserve.length !== lockedTickets.length) {
+            // If update touched fewer rows than we locked, treat as failure
             pl.error(c, "Failed to reserve tickets");
             throw new HTTPException(500, {
               res: new CustomErrorResponse({
