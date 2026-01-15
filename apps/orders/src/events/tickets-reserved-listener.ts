@@ -50,8 +50,8 @@ export class TicketsReservedListener extends BaseListener<TicketsReservedEvent> 
           // Business rule violation – acknowledge to stop retries.
           // TODO: use msg.term()
           msg.ack();
-
-          throw new Error("Ticket(s) already reserved in an active order");
+          tx.rollback();
+          return;
         }
 
         const result = await tx.insert(ordersTable).values(dbData);
