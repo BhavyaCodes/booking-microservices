@@ -34,7 +34,8 @@ export const ordersTable = pgTable(
       .default(OrderStatus.CREATED)
       .$type<OrderStatus>(),
     expiresAt: timestamp().notNull(),
-    ticketIds: text("ticket_ids").array().notNull(),
+    ticketIds: uuid("ticket_ids").array().notNull(),
+    createdAt: timestamp().defaultNow().notNull(),
   },
   (table) => [index("ticket_ids_idx").using("gin", table.ticketIds)],
 );

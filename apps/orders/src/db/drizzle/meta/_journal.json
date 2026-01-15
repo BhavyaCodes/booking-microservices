@@ -36,6 +36,13 @@
       "when": 1768509029955,
       "tag": "0004_chilly_forgotten_one",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1768510590427,
+      "tag": "0005_daffy_shatterstar",
+      "breakpoints": true
     }
   ]
 }
