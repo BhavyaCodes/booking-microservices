@@ -16,9 +16,6 @@ export class TicketsReservedListener extends BaseListener<TicketsReservedEvent> 
       "TicketsReserved event received",
     );
 
-    // get unique id from NATS message to ensure idempotency
-    // const natsMessageId = msg.headers.get("Nats-Msg-Id");
-
     const data = msg.json<TicketsReservedEvent["data"]>();
     pl.trace({ data }, "TicketsReserved event data");
 
@@ -51,7 +48,9 @@ export class TicketsReservedListener extends BaseListener<TicketsReservedEvent> 
             "Rejecting TicketsReserved: one or more tickets already reserved",
           );
           // Business rule violation – acknowledge to stop retries.
+          // TODO: use msg.term()
           msg.ack();
+          tx.rollback();
           return;
         }
 
@@ -60,8 +59,8 @@ export class TicketsReservedListener extends BaseListener<TicketsReservedEvent> 
           { result },
           `Inserted ${result.rowCount} orders from TicketsReserved event`,
         );
-        msg.ack();
       });
+      msg.ack();
     } catch (error) {
       pl.error(error, "Failed to process TicketsReserved event");
       const deliveryCount = msg.info?.deliveryCount ?? 0;
