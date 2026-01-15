@@ -95,6 +95,7 @@ describe("tickets-reserved-listener test", () => {
     const listener = new TicketsReservedListener(natsWrapper.js);
     await listener.listen();
     const ack = vi.fn();
+    const nak = vi.fn();
 
     const sharedTicketId = uuidv7();
     const existingOrder: typeof ordersTable.$inferInsert = {
@@ -117,6 +118,8 @@ describe("tickets-reserved-listener test", () => {
     const msg = {
       json: () => payload,
       ack,
+      nak,
+      info: { deliveryCount: 1 },
     } as any;
 
     await natsWrapper.__triggerMessage(msg);
@@ -283,6 +286,7 @@ describe("tickets-reserved-listener test", () => {
     const listener = new TicketsReservedListener(natsWrapper.js);
     await listener.listen();
     const ack = vi.fn();
+    const nak = vi.fn();
 
     const sharedTicket = uuidv7();
     const existingOrder: typeof ordersTable.$inferInsert = {
@@ -304,6 +308,8 @@ describe("tickets-reserved-listener test", () => {
     const msg = {
       json: () => payload,
       ack,
+      nak,
+      info: { deliveryCount: 1 },
     } as any;
 
     await natsWrapper.__triggerMessage(msg);
