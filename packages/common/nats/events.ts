@@ -16,7 +16,7 @@ export type TicketsReservedEvent = {
   data: {
     ticketIds: string[];
     userId: string;
-    price: number;
+    amount: number;
     expiresAt: DateISOString;
     // TODO: Additional fields can be added as needed
     // e.g., individual ticket details, better invoice, etc.
