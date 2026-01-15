@@ -17,7 +17,7 @@ export enum OrderStatus {
 }
 
 export const orderStatusEnum = pgEnum(
-  "nats_subjects",
+  "order_status",
   Object.values(OrderStatus) as [string, ...string[]],
 );
 
