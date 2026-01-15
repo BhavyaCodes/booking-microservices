@@ -25,3 +25,4 @@
 - [ ] ack policy, retention etc
 - [ ] isolation levels for transactions
 - [ ] test coverage
+- [ ] handle NODE_ENV -> CI
