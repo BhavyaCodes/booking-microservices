@@ -5,8 +5,9 @@ import {
   timestamp,
   pgEnum,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 export enum OrderStatus {
   CREATED = "created",
@@ -36,5 +37,10 @@ export const ordersTable = pgTable(
     ticketIds: uuid("ticket_ids").array().notNull(),
     createdAt: timestamp().defaultNow().notNull(),
   },
-  (table) => [index("ticket_ids_idx").using("gin", table.ticketIds)],
+  (table) => [
+    index("ticket_ids_idx").using("gin", table.ticketIds),
+    uniqueIndex("user_created_order_idx")
+      .on(table.userId, table.status)
+      .where(eq(table.status, OrderStatus.CREATED)),
+  ],
 );
