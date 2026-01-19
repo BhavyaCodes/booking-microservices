@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import { natsWrapper } from "./nats-wrapper";
 // import { outboxPublisher } from "./outbox";
 import { pl } from "./logger";
+import { TicketsReservedListener } from "./events/tickets-reserved-listener";
 
 const main = async () => {
   if (!process.env.JWT_KEY) {
@@ -31,6 +32,7 @@ const main = async () => {
   }
 
   // new TicketCreatedListener(natsWrapper.js).listen();
+  new TicketsReservedListener(natsWrapper.js).listen();
 
   await db.execute(sql`SELECT 1`).catch((error) => {
     pl.fatal(error, "Failed to connect to Postgres");
