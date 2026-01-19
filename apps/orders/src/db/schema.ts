@@ -44,3 +44,5 @@ export const ordersTable = pgTable(
       .where(eq(table.status, OrderStatus.CREATED)),
   ],
 );
+
+// 1 user can only add 1 created order at a time
