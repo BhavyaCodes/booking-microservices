@@ -6,11 +6,21 @@ import {
   pgEnum,
   index,
   uniqueIndex,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { eq, sql } from "drizzle-orm";
+import { Stripe } from "stripe";
 
 export enum OrderStatus {
+  /**
+   * Order has been created but not yet completed
+   * user can only have one created order at a time
+   */
   CREATED = "created",
+  /**
+   * payment intent has been created for the order
+   */
+  PAYMENT_IN_PROGRESS = "payment_in_progress",
   CANCELED = "canceled",
   COMPLETED = "completed",
   EXPIRED = "expired",
@@ -34,8 +44,11 @@ export const ordersTable = pgTable(
       .default(OrderStatus.CREATED)
       .$type<OrderStatus>(),
     expiresAt: timestamp().notNull(),
-    ticketIds: uuid("ticket_ids").array().notNull(),
+    ticketIds: uuid().array().notNull(),
     createdAt: timestamp().defaultNow().notNull(),
+    paymentIntent: jsonb()
+      .default(null)
+      .$type<Stripe.Response<Stripe.PaymentIntent>>(),
   },
   (table) => [
     index("ticket_ids_idx").using("gin", table.ticketIds),

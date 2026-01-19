@@ -51,10 +51,16 @@ spec:
                 secretKeyRef:
                   name: booking-secrets
                   key: ORDERS_POSTGRES_DB
+            - name: ORDERS_STRIPE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: booking-secrets
+                  key: ORDERS_STRIPE_SECRET_KEY
             - name: POD_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+
 ---
 apiVersion: v1
 kind: Service
