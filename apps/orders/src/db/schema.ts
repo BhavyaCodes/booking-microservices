@@ -7,6 +7,7 @@ import {
   index,
   uniqueIndex,
   jsonb,
+  varchar,
 } from "drizzle-orm/pg-core";
 import { eq, sql } from "drizzle-orm";
 import { Stripe } from "stripe";
@@ -37,7 +38,7 @@ export const ordersTable = pgTable(
     id: uuid()
       .primaryKey()
       .default(sql`uuidv7()`),
-    userId: uuid().notNull(),
+    userId: varchar({ length: 255 }).notNull(),
     amount: integer().notNull(),
     status: orderStatusEnum()
       .notNull()
