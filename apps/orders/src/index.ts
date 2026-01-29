@@ -54,10 +54,10 @@ const main = async () => {
   // });
 
   const cleanup = async () => {
-    await notifClient.query("UNLISTEN outbox_insert");
-    await notifClient.release();
-    await natsWrapper.nc.drain();
-    await pool.end();
+     notifClient.query("UNLISTEN outbox_insert");
+     notifClient.release();
+     natsWrapper.nc.drain();
+     pool.end();
   };
 
   Bun.serve({

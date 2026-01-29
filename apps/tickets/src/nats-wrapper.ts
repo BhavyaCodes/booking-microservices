@@ -25,8 +25,27 @@ class NatsWrapper {
     server: string,
     name = process.env.POD_NAME || "default-nats-client-tickets",
   ) {
-    this._nc = await connect({ servers: server, name: name });
-    this._js = jetstream(this._nc);
+    const maxRetries = 10;
+    const baseDelay = 1000; // 1 second
+    let lastError: any;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        this._nc = await connect({ servers: server, name: name });
+        this._js = jetstream(this._nc);
+        return;
+      } catch (error) {
+        lastError = error;
+        const delay = baseDelay * Math.pow(2, attempt);
+        console.log(
+          `NATS connection attempt ${attempt + 1}/${maxRetries} failed. Retrying in ${delay}ms...`,
+          error,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+
+    throw lastError;
   }
 }
 

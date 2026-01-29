@@ -1,5 +1,5 @@
 import type { CurrentUser } from "@booking/common/interfaces";
-import { extractCurrentUser } from "@booking/common/middlewares";
+import { extractCurrentUser, requireAuth } from "@booking/common/middlewares";
 import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { db } from "./db";
@@ -14,6 +14,8 @@ import {
 import { pl } from "./logger";
 import Stripe from "stripe";
 import { eq } from "drizzle-orm";
+import { countryCodes } from "./utils/country-iso-3166-1-alpha-2";
+import { upsertStripeCustomer } from "./utils/stripe";
 
 const stripe = new Stripe(process.env.ORDERS_STRIPE_SECRET_KEY!, {
   apiVersion: "2025-12-15.clover",
@@ -32,13 +34,47 @@ const app = new Hono<{
   })
   .post(
     "/api/orders/create-payment-intent/:orderId",
+    requireAuth,
     zValidator(
       "param",
       z.object({ orderId: z.uuid({ version: "v7" }) }),
       zodValidationHook,
     ),
+    zValidator(
+      "json",
+      z.object({
+        address: z.object({
+          city: z.string().max(50),
+          country: z
+            .string()
+            .length(2)
+            .refine((val) => {
+              if (val in countryCodes) {
+                return true;
+              }
+              return false;
+            }),
+          line1: z.string(),
+          line2: z.string().optional(),
+          postal_code: z.string().max(20),
+          state: z.string(),
+        }),
+        name: z.string().max(100),
+      }),
+      zodValidationHook,
+    ),
     async (c) => {
       const { orderId } = c.req.param();
+      const { address, name } = c.req.valid("json");
+      const userId = c.get("currentUser")!.id;
+
+      // Upsert Stripe customer before transaction
+      const stripeCustomerId = await upsertStripeCustomer(
+        userId,
+        address,
+        name,
+        stripe,
+      );
 
       try {
         const result = await db.transaction(async (tx) => {
@@ -69,9 +105,11 @@ const app = new Hono<{
           const paymentIntent = await stripe.paymentIntents.create({
             amount: order.amount,
             currency: "inr",
+            customer: stripeCustomerId,
             metadata: {
               orderId: order.id,
             },
+            description: `Payment for order ${order.id}`,
           });
 
           pl.debug(paymentIntent, "Created Payment Intent");
@@ -93,7 +131,7 @@ const app = new Hono<{
       }
     },
   )
-  .get("/api/orders/pending", async (c) => {
+  .get("/api/orders/pending", requireAuth, async (c) => {
     const currentUser = c.get("currentUser");
 
     const pendingOrder = await db.query.ordersTable.findFirst({
@@ -109,7 +147,6 @@ const app = new Hono<{
       order: pendingOrder || null,
     });
   })
-
   .onError((error, c) => {
     if (error instanceof HTTPException) {
       return error.getResponse();
