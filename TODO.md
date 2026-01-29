@@ -21,6 +21,19 @@
 - [ ] add name to seatCategory table
 - [x] update names for waiting jobs
 
+### Orders srv
+#### payments
+ - [ ] create payment intent
+   - [ ] handle stripe customers
+ - [ ] receive webhook for scenarios
+  - [ ] success
+  - [ ] failed/cancelled 
+ - [ ] handle db after failure
+
+#### Expiration of orders
+ - [ ] integrate bulljs
+ - [ ] send expired event
+
 ## Later
 
 - [x] error helper to make HTTP error payload same across the app
