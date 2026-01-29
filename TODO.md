@@ -18,6 +18,8 @@
 - [x] manually test flow till edit event + edit seat category + publish + try edit event + try edit seat category
 - [x] update 409 errors (check PR)
 - [ ] add cron to outbox
+- [ ] add name to seatCategory table
+- [x] update names for waiting jobs
 
 ## Later
 

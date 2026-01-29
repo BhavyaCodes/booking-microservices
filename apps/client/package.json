@@ -10,7 +10,10 @@
   },
   "dependencies": {
     "@booking/auth": "workspace:*",
+    "@booking/orders": "workspace:*",
     "@react-oauth/google": "^0.12.2",
+    "@stripe/react-stripe-js": "^5.4.1",
+    "@stripe/stripe-js": "^8.6.3",
     "next": "16.0.10",
     "react": "19.2.1",
     "react-dom": "19.2.1"
