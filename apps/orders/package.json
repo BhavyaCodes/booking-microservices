@@ -1,5 +1,5 @@
 {
-  "name": "orders",
+  "name": "@booking/orders",
   "scripts": {
     "drizzle-kit:generate-dev": "drizzle-kit generate --config=./src/db/drizzle.config.ts",
     "drizzle-kit:migrate-dev": "drizzle-kit migrate --config=./src/db/drizzle.config.ts",
@@ -7,6 +7,12 @@
     "dev": "bun run --watch src/index.ts",
     "test": "bun run --env-file=.env.test vitest",
     "test:run": "bun run --env-file=.env.test vitest run"
+  },
+  "exports": {
+    "./client": {
+      "types": "./src/client.ts",
+      "default": "./src/client.ts"
+    }
   },
   "dependencies": {
     "@booking/common": "workspace:*",
