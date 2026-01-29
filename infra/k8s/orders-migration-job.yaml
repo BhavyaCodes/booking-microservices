@@ -3,14 +3,15 @@ kind: Job
 metadata:
   name: orders-migration
 spec:
-  ttlSecondsAfterFinished: 30
+  ttlSecondsAfterFinished: 100
   backoffLimit: 3
   template:
     spec:
       restartPolicy: Never
       initContainers:
-        - name: wait-for-postgres
+        - name: wait-for-postgres-orders
           image: busybox:latest
+          imagePullPolicy: IfNotPresent
           command:
             - sh
             - -c
@@ -18,7 +19,7 @@ spec:
       containers:
         - name: migrate-db-orders
           image: booking-dev-orders:latest
-          imagePullPolicy: Never
+          imagePullPolicy: IfNotPresent
           env:
             - name: ORDERS_POSTGRES_PASSWORD
               valueFrom:

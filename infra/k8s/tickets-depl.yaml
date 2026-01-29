@@ -14,14 +14,16 @@ spec:
     spec:
       serviceAccountName: tickets
       initContainers:
-        - name: wait-for-postgres
+        - name: wait-for-postgres-tickets
           image: busybox:latest
+          imagePullPolicy: IfNotPresent
           command:
             - sh
             - -c
             - until nc -z tickets-postgres-srv 5432; do echo waiting for postgres; sleep 2; done
         - name: wait-for-migration-job
           image: bitnami/kubectl:latest
+          imagePullPolicy: IfNotPresent
           command:
             - sh
             - -c
@@ -29,7 +31,7 @@ spec:
       containers:
         - name: tickets
           image: booking-dev-tickets:latest
-          imagePullPolicy: Never
+          imagePullPolicy: IfNotPresent
           env:
             - name: JWT_KEY
               valueFrom:
