@@ -9,7 +9,7 @@ import {
   jsonb,
   varchar,
 } from "drizzle-orm/pg-core";
-import { eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { Stripe } from "stripe";
 
 export enum OrderStatus {
@@ -21,9 +21,14 @@ export enum OrderStatus {
   /**
    * payment intent has been created for the order
    */
-  PAYMENT_IN_PROGRESS = "payment_in_progress",
+  PAYMENT_INTENT_CREATED = "payment_intent_created",
+  REQUIRES_ACTION = "requires_action",
+  PROCESSING = "processing",
   CANCELED = "canceled",
   COMPLETED = "completed",
+  /**
+   * Order has expired without payment
+   */
   EXPIRED = "expired",
 }
 
@@ -53,10 +58,14 @@ export const ordersTable = pgTable(
   },
   (table) => [
     index("ticket_ids_idx").using("gin", table.ticketIds),
-    uniqueIndex("user_created_order_idx")
-      .on(table.userId, table.status)
-      .where(eq(table.status, OrderStatus.CREATED)),
+    uniqueIndex("user_active_order_idx")
+      .on(table.userId)
+      .where(
+        sql.raw(
+          `"orders"."status" IN ('${OrderStatus.CREATED}', '${OrderStatus.PAYMENT_INTENT_CREATED}', '${OrderStatus.REQUIRES_ACTION}', '${OrderStatus.PROCESSING}')`,
+        ),
+      ),
   ],
 );
 
-// 1 user can only add 1 created order at a time
+// 1 user can only have 1 active order at a time

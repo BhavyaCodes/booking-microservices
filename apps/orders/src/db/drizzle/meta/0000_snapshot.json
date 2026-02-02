@@ -1,5 +1,5 @@
 {
-  "id": "833db5cf-d7ec-4f76-bce2-ed93d2db8ed2",
+  "id": "2c28ef4f-52d2-4696-8716-3cf0c29612ca",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -17,7 +17,7 @@
         },
         "user_id": {
           "name": "user_id",
-          "type": "uuid",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true
         },
@@ -53,6 +53,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "payment_intent": {
+          "name": "payment_intent",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'null'::jsonb"
         }
       },
       "indexes": {
@@ -71,24 +78,18 @@
           "method": "gin",
           "with": {}
         },
-        "user_created_order_idx": {
-          "name": "user_created_order_idx",
+        "user_active_order_idx": {
+          "name": "user_active_order_idx",
           "columns": [
             {
               "expression": "user_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
-            },
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
             }
           ],
           "isUnique": true,
-          "where": "\"orders\".\"status\" = $1",
+          "where": "\"orders\".\"status\" IN ('created', 'payment_intent_created', 'requires_action', 'processing')",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -108,6 +109,9 @@
       "schema": "public",
       "values": [
         "created",
+        "payment_intent_created",
+        "requires_action",
+        "processing",
         "canceled",
         "completed",
         "expired"

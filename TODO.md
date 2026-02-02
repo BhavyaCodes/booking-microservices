@@ -23,12 +23,13 @@
 
 ### Orders srv
 #### payments
- - [ ] create payment intent
-   - [ ] handle stripe customers
+ - [x] create payment intent
+ - [ ] handle stripe customers
  - [ ] receive webhook for scenarios
   - [ ] success
   - [ ] failed/cancelled 
  - [ ] handle db after failure
+ - [ ] emit events after webhook/status update of order
 
 #### Expiration of orders
  - [ ] integrate bulljs
@@ -43,3 +44,11 @@
 - [ ] Reliability config & error handling
   - [ ] handle NODE_ENV -> CI
   - [ ] Implement msg.term() handling in tickets-reserved-listener.ts (see TODO at line 51) and design dead letter queue
+- [ ] video service
+  - [ ] s3 local
+  - [ ] upload video
+    - [ ] format video -> create multiple variants and improve encoding for web friendly
+
+### NOTES
+ - for stripe webhook -> kubectl port-forward service/orders-srv 3001:3000
+                      -> ngrok http --url=<permanent-ngrok-url> 127.0.0.1:3001
