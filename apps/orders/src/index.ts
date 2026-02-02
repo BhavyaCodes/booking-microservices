@@ -12,6 +12,12 @@ const main = async () => {
   }
 
   if (
+    !process.env.ORDERS_STRIPE_SECRET_KEY ||
+    !process.env.ORDERS_STRIPE_WEBHOOK_SECRET
+  ) {
+    throw new Error("Stripe environment variables must be set");
+  }
+  if (
     !process.env.ORDERS_POSTGRES_USER ||
     !process.env.ORDERS_POSTGRES_PASSWORD ||
     !process.env.ORDERS_POSTGRES_DB
@@ -54,10 +60,10 @@ const main = async () => {
   // });
 
   const cleanup = async () => {
-     notifClient.query("UNLISTEN outbox_insert");
-     notifClient.release();
-     natsWrapper.nc.drain();
-     pool.end();
+    notifClient.query("UNLISTEN outbox_insert");
+    notifClient.release();
+    natsWrapper.nc.drain();
+    pool.end();
   };
 
   Bun.serve({
