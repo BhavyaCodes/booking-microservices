@@ -58,6 +58,11 @@ spec:
                 secretKeyRef:
                   name: booking-secrets
                   key: ORDERS_STRIPE_SECRET_KEY
+            - name: ORDERS_STRIPE_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: booking-secrets
+                  key: ORDERS_STRIPE_WEBHOOK_SECRET
             - name: POD_NAME
               valueFrom:
                 fieldRef:
