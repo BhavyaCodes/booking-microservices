@@ -1,5 +1,9 @@
 import type { CurrentUser } from "@booking/common/interfaces";
-import { extractCurrentUser, requireAuth } from "@booking/common/middlewares";
+import {
+  extractCurrentUser,
+  requireAdmin,
+  requireAuth,
+} from "@booking/common/middlewares";
 import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { db } from "./db";
@@ -18,7 +22,7 @@ import { countryCodes } from "./utils/country-iso-3166-1-alpha-2";
 import { upsertStripeCustomer } from "./utils/stripe";
 
 const stripe = new Stripe(process.env.ORDERS_STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-12-15.clover",
+  apiVersion: "2026-01-28.clover",
 });
 
 const app = new Hono<{
@@ -31,6 +35,10 @@ const app = new Hono<{
   .use(extractCurrentUser)
   .get("/api/orders", (c) => {
     return c.text("Hello from orders service!");
+  })
+  .get("/api/orders/admin/orders", requireAdmin, async (c) => {
+    const allOrders = await db.select().from(ordersTable);
+    return c.json({ orders: allOrders });
   })
   .post(
     "/api/orders/create-payment-intent/:orderId",
@@ -143,9 +151,167 @@ const app = new Hono<{
       },
     });
 
+    pl.debug(pendingOrder, "Fetched pending order");
+
     return c.json({
       order: pendingOrder || null,
     });
+  })
+  .post("/api/orders/stripe-webhook", async (c) => {
+    const endpointSecret = process.env.ORDERS_STRIPE_WEBHOOK_SECRET!;
+    pl.debug("Received Stripe webhook");
+
+    const signature = c.req.header("Stripe-Signature");
+
+    if (!signature) {
+      throw new HTTPException(400, {
+        res: new CustomErrorResponse({
+          message: "Missing Stripe-Signature header",
+        }),
+      });
+    }
+
+    let event: Stripe.Event;
+    try {
+      event = await stripe.webhooks.constructEventAsync(
+        await c.req.text(),
+        signature,
+        endpointSecret,
+      );
+    } catch (err) {
+      pl.error(err, `⚠️ Webhook signature verification failed.`);
+
+      throw new HTTPException(400, {
+        res: new CustomErrorResponse({
+          message: "Webhook signature verification failed.",
+        }),
+      });
+    }
+
+    if (!event) {
+      throw new HTTPException(500, {
+        res: new CustomErrorResponse({
+          message: "Failed to construct Stripe event",
+        }),
+      });
+    }
+
+    const orderId = (event.data.object as Stripe.PaymentIntent).metadata
+      .orderId;
+
+    if (!orderId) {
+      throw new HTTPException(400, {
+        res: new CustomErrorResponse({
+          message: "Missing orderId in PaymentIntent metadata",
+        }),
+      });
+    }
+
+    switch (event.type) {
+      case "payment_intent.succeeded":
+        pl.debug(event.data.object, "PaymentIntent succeeded webhook received");
+
+        // Update order status to COMPLETED
+        try {
+          await db
+            .update(ordersTable)
+            .set({ status: OrderStatus.COMPLETED })
+            .where(eq(ordersTable.id, orderId));
+
+          return c.status(200);
+        } catch (error) {
+          pl.error(error, "Failed to update order status");
+          throw new HTTPException(500, {
+            res: new CustomErrorResponse({
+              message: "Failed to update order status",
+            }),
+          });
+        }
+
+      case "payment_intent.payment_failed":
+        pl.debug(
+          event.data.object,
+          "PaymentIntent payment_failed webhook received",
+        );
+
+        try {
+          await db
+            .update(ordersTable)
+            .set({ status: OrderStatus.CANCELED })
+            .where(eq(ordersTable.id, event.data.object.metadata.orderId));
+
+          return c.status(200);
+        } catch (error) {
+          pl.error(error, "Failed to update order status");
+          throw new HTTPException(500, {
+            res: new CustomErrorResponse({
+              message: "Failed to update order status",
+            }),
+          });
+        }
+
+      case "payment_intent.canceled":
+        pl.debug(event.data.object, "PaymentIntent canceled webhook received");
+        try {
+          await db
+            .update(ordersTable)
+            .set({ status: OrderStatus.CANCELED })
+            .where(eq(ordersTable.id, event.data.object.metadata.orderId));
+          return c.status(200);
+        } catch (error) {
+          pl.error(error, "Failed to update order status");
+          throw new HTTPException(500, {
+            res: new CustomErrorResponse({
+              message: "Failed to update order status",
+            }),
+          });
+        }
+      case "payment_intent.processing":
+        pl.debug(
+          event.data.object,
+          "PaymentIntent processing webhook received",
+        );
+        try {
+          await db
+            .update(ordersTable)
+            .set({ status: OrderStatus.PROCESSING })
+            .where(eq(ordersTable.id, event.data.object.metadata.orderId));
+          return c.status(200);
+        } catch (error) {
+          pl.error(error, "Failed to update order status");
+          throw new HTTPException(500, {
+            res: new CustomErrorResponse({
+              message: "Failed to update order status",
+            }),
+          });
+        }
+      case "payment_intent.requires_action":
+        pl.debug(
+          event.data.object,
+          "PaymentIntent requires_action webhook received",
+        );
+        try {
+          await db
+            .update(ordersTable)
+            .set({ status: OrderStatus.REQUIRES_ACTION })
+            .where(eq(ordersTable.id, event.data.object.metadata.orderId));
+          return c.status(200);
+        } catch (error) {
+          pl.error(error, "Failed to update order status");
+          throw new HTTPException(500, {
+            res: new CustomErrorResponse({
+              message: "Failed to update order status",
+            }),
+          });
+        }
+      default:
+        pl.warn(
+          event.data.object,
+          `Unhandled event type ${event.type} received`,
+        );
+    }
+
+    return c.json({ received: true });
   })
   .onError((error, c) => {
     if (error instanceof HTTPException) {
