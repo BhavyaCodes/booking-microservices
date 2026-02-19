@@ -25,9 +25,10 @@
 #### payments
  - [x] create payment intent
  - [ ] handle stripe customers
- - [ ] receive webhook for scenarios
-  - [ ] success
-  - [ ] failed/cancelled 
+ - [x] check status of payment api
+ - [x] receive webhook for scenarios
+  - [x] success
+  - [x] failed/cancelled 
  - [ ] handle db after failure
  - [ ] emit events after webhook/status update of order
 
