@@ -45,18 +45,23 @@ const main = async () => {
   pl.trace("🚀 ~ listening for outbox_insert notifications");
 
   notifClient.on("notification", (msg) => {
+    pl.debug("Received pg notification");
     if (msg.channel === "outbox_insert") {
-      outboxPublisher().catch((err) => {
-        pl.error(err, "Failed to process outbox events");
-      });
+      outboxPublisher()
+        .catch((err) => {
+          pl.error(err, "Failed to process outbox events");
+        })
+        .finally(() => {
+          pl.debug("Finished processing outbox events");
+        });
     }
   });
 
   const cleanup = async () => {
-    await notifClient.query("UNLISTEN outbox_insert");
-    await notifClient.release();
-    await natsWrapper.nc.drain();
-    await pool.end();
+    notifClient.query("UNLISTEN outbox_insert").catch();
+    notifClient.release();
+    natsWrapper.nc.drain().catch();
+    pool.end().catch();
   };
 
   Bun.serve({

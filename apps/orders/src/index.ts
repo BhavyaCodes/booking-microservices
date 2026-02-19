@@ -60,10 +60,10 @@ const main = async () => {
   // });
 
   const cleanup = async () => {
-    notifClient.query("UNLISTEN outbox_insert");
+    notifClient.query("UNLISTEN outbox_insert").catch();
     notifClient.release();
-    natsWrapper.nc.drain();
-    pool.end();
+    natsWrapper.nc.drain().catch();
+    pool.end().catch();
   };
 
   Bun.serve({
@@ -74,12 +74,18 @@ const main = async () => {
   // Graceful shutdown
   process.on("SIGINT", async () => {
     pl.info("SIGINT received");
-    await cleanup();
+    await cleanup().then(() => {
+      pl.info("Cleanup completed, exiting");
+      process.exit(0);
+    });
   });
 
   process.on("SIGTERM", async () => {
     pl.info("SIGTERM received");
-    await cleanup();
+    await cleanup().then(() => {
+      pl.info("Cleanup completed, exiting");
+      process.exit(0);
+    });
   });
 };
 
