@@ -22,10 +22,16 @@ export enum OrderStatus {
    * payment intent has been created for the order
    */
   PAYMENT_INTENT_CREATED = "payment_intent_created",
+
   REQUIRES_ACTION = "requires_action",
+  REQUIRES_CAPTURE = "requires_capture",
+  REQUIRES_CONFIRMATION = "requires_confirmation",
+  REQUIRES_PAYMENT_METHOD = "requires_payment_method",
   PROCESSING = "processing",
+
   CANCELED = "canceled",
-  COMPLETED = "completed",
+
+  SUCCEEDED = "succeeded",
   /**
    * Order has expired without payment
    */

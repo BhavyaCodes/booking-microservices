@@ -1,4 +1,4 @@
-CREATE TYPE "public"."order_status" AS ENUM('created', 'payment_intent_created', 'requires_action', 'processing', 'canceled', 'completed', 'expired');--> statement-breakpoint
+CREATE TYPE "public"."order_status" AS ENUM('created', 'payment_intent_created', 'requires_action', 'requires_capture', 'requires_confirmation', 'requires_payment_method', 'processing', 'canceled', 'succeeded', 'expired');--> statement-breakpoint
 CREATE TABLE "orders" (
 	"id" uuid PRIMARY KEY DEFAULT uuidv7() NOT NULL,
 	"user_id" varchar(255) NOT NULL,

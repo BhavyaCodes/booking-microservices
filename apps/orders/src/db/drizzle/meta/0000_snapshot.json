@@ -1,5 +1,5 @@
 {
-  "id": "2c28ef4f-52d2-4696-8716-3cf0c29612ca",
+  "id": "2617861f-a757-405d-90a7-35013526a03f",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -111,9 +111,12 @@
         "created",
         "payment_intent_created",
         "requires_action",
+        "requires_capture",
+        "requires_confirmation",
+        "requires_payment_method",
         "processing",
         "canceled",
-        "completed",
+        "succeeded",
         "expired"
       ]
     }
