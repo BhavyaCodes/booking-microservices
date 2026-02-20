@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { ordersTable, OrderStatus } from "../schema";
 import { v7 as uuidv7 } from "uuid";
 import { db } from "..";
-import { fa } from "zod/v4/locales";
 
 describe("orders-table", () => {
   it("should have status of CREATED by default", async () => {

@@ -35,7 +35,8 @@
 #### Expiration of orders
  - [ ] integrate bulljs
  - [ ] send expired event
-
+#### Client
+ - [ ] don't use stripe client secret in url
 ## Later
 
 - [x] error helper to make HTTP error payload same across the app
