@@ -27,6 +27,15 @@ const ordersPage = async ({
   // console.log("🚀 ~ ordersPage ~ _data:", _data);
   const data = await orderResponse.json();
 
+  if(data.order?.paymentIntent?.client_secret){
+    return (
+      <>
+      <h1>payment componenttt</h1>
+      <PaymentComponent clientSecret={data.order?.paymentIntent?.client_secret} />
+      </>
+    );
+  }
+
   async function createPaymentIntent(formData: FormData) {
     "use server";
 
