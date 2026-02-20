@@ -52,7 +52,7 @@ export const ticketsTable = pgTable(
       .references(() => eventsTable.id, { onDelete: "cascade" }),
     row: integer().notNull(),
     seatNumber: integer().notNull(),
-    userId: uuid(),
+    userId: varchar({ length: 255 }),
     version: integer().notNull().default(0),
     // .$onUpdateFn((): SQL => sql`${ticketsTable.version} + 1`),
   },

@@ -5,43 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1767650545009,
-      "tag": "0000_parallel_solo",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1767903185513,
-      "tag": "0001_moaning_cargill",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1768501093936,
-      "tag": "0002_puzzling_logan",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1768508740451,
-      "tag": "0003_violet_thunderbolts",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1768509029955,
-      "tag": "0004_chilly_forgotten_one",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1768510590427,
-      "tag": "0005_daffy_shatterstar",
+      "when": 1771238794749,
+      "tag": "0000_tan_bishop",
       "breakpoints": true
     }
   ]

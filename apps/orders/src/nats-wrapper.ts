@@ -1,6 +1,7 @@
 import { jetstream, JetStreamClient } from "@nats-io/jetstream";
 import { NatsConnection } from "@nats-io/nats-core/lib/core";
 import { connect } from "@nats-io/transport-node";
+import { pl } from "./logger";
 
 class NatsWrapper {
   private _nc?: NatsConnection;
@@ -25,8 +26,27 @@ class NatsWrapper {
     server: string,
     name = process.env.POD_NAME || "default-nats-client-orders",
   ) {
-    this._nc = await connect({ servers: server, name: name });
-    this._js = jetstream(this._nc);
+    const maxRetries = 10;
+    const baseDelay = 1000; // 1 second
+    let lastError: any;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        this._nc = await connect({ servers: server, name: name });
+        this._js = jetstream(this._nc);
+        return;
+      } catch (error) {
+        lastError = error;
+        const delay = baseDelay * Math.pow(2, attempt);
+        pl.error(
+          error,
+          `NATS connection attempt ${attempt + 1}/${maxRetries} failed. Retrying in ${delay}ms...`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+
+    throw lastError;
   }
 }
 

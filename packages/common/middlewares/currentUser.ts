@@ -10,7 +10,7 @@ export const extractCurrentUser = async (c: Context, next: Next) => {
   }
 
   try {
-    const payload = await verify(sessionCookie, process.env.JWT_KEY!);
+    const payload = await verify(sessionCookie, process.env.JWT_KEY!, "HS256");
     c.set("currentUser", {
       id: payload.id as string,
       role: payload.role as UserRoles,

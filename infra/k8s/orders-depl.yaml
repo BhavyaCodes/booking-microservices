@@ -14,14 +14,16 @@ spec:
     spec:
       serviceAccountName: orders
       initContainers:
-        - name: wait-for-postgres
+        - name: wait-for-postgres-orders
           image: busybox:latest
+          imagePullPolicy: IfNotPresent
           command:
             - sh
             - -c
             - until nc -z orders-postgres-srv 5432; do echo waiting for postgres; sleep 2; done
         - name: wait-for-migration-job
           image: bitnami/kubectl:latest
+          imagePullPolicy: IfNotPresent
           command:
             - sh
             - -c
@@ -51,10 +53,21 @@ spec:
                 secretKeyRef:
                   name: booking-secrets
                   key: ORDERS_POSTGRES_DB
+            - name: ORDERS_STRIPE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: booking-secrets
+                  key: ORDERS_STRIPE_SECRET_KEY
+            - name: ORDERS_STRIPE_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: booking-secrets
+                  key: ORDERS_STRIPE_WEBHOOK_SECRET
             - name: POD_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+
 ---
 apiVersion: v1
 kind: Service

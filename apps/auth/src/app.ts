@@ -108,6 +108,7 @@ const app = new Hono<{
         exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7, // Token expires in 7 days
       },
       process.env.JWT_KEY!,
+      "HS256",
     );
 
     setCookie(c, "session", cookieJwt, {

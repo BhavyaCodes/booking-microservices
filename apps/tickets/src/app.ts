@@ -255,6 +255,7 @@ const app = new Hono<{
       return c.json(result, 200);
     },
   )
+  //TODO: add get event endpoints
   // seat categories routes
   .post(
     "/api/tickets/admin/events/:eventId/seat-categories",
@@ -671,7 +672,7 @@ const app = new Hono<{
           eq(seatCategoriesTable.eventId, eventsSubquery.id),
         );
 
-      pl.debug(result, "Seat categories with event join result");
+      pl.debug({ result }, "Seat categories with event join result");
 
       // Check if event exists and is published by verifying if we got any results
       // with valid event data, or if no results, event doesn't exist or is in draft

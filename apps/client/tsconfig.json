@@ -20,7 +20,8 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
-      "@booking/auth/app": ["../auth/src/app.ts"]
+      "@booking/auth/app": ["../auth/src/app.ts"],
+      "@booking/orders/app": ["../orders/src/app.ts"]
     }
   },
   "include": [

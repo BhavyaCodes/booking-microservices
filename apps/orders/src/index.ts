@@ -4,13 +4,19 @@ import { sql } from "drizzle-orm";
 import { natsWrapper } from "./nats-wrapper";
 // import { outboxPublisher } from "./outbox";
 import { pl } from "./logger";
-import { TicketCreatedListener } from "./events/ticket-created-listener";
+import { TicketsReservedListener } from "./events/tickets-reserved-listener";
 
 const main = async () => {
   if (!process.env.JWT_KEY) {
     throw new Error("JWT_KEY must be present");
   }
 
+  if (
+    !process.env.ORDERS_STRIPE_SECRET_KEY ||
+    !process.env.ORDERS_STRIPE_WEBHOOK_SECRET
+  ) {
+    throw new Error("Stripe environment variables must be set");
+  }
   if (
     !process.env.ORDERS_POSTGRES_USER ||
     !process.env.ORDERS_POSTGRES_PASSWORD ||
@@ -31,7 +37,8 @@ const main = async () => {
     process.exit(1);
   }
 
-  new TicketCreatedListener(natsWrapper.js).listen();
+  // new TicketCreatedListener(natsWrapper.js).listen();
+  new TicketsReservedListener(natsWrapper.js).listen();
 
   await db.execute(sql`SELECT 1`).catch((error) => {
     pl.fatal(error, "Failed to connect to Postgres");
@@ -53,10 +60,16 @@ const main = async () => {
   // });
 
   const cleanup = async () => {
-    await notifClient.query("UNLISTEN outbox_insert");
-    await notifClient.release();
-    await natsWrapper.nc.drain();
-    await pool.end();
+    notifClient.query("UNLISTEN outbox_insert").catch((err) => {
+      pl.error(err, "Failed to unlisten outbox_insert");
+    });
+    notifClient.release();
+    natsWrapper.nc.drain().catch((err) => {
+      pl.error(err, "Failed to drain NATS connection");
+    });
+    pool.end().catch((err) => {
+      pl.error(err, "Failed to end Postgres connection pool");
+    });
   };
 
   Bun.serve({
@@ -67,12 +80,18 @@ const main = async () => {
   // Graceful shutdown
   process.on("SIGINT", async () => {
     pl.info("SIGINT received");
-    await cleanup();
+    await cleanup().then(() => {
+      pl.info("Cleanup completed, exiting");
+      process.exit(0);
+    });
   });
 
   process.on("SIGTERM", async () => {
     pl.info("SIGTERM received");
-    await cleanup();
+    await cleanup().then(() => {
+      pl.info("Cleanup completed, exiting");
+      process.exit(0);
+    });
   });
 };
 
