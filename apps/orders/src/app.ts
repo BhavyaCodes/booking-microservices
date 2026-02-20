@@ -17,7 +17,7 @@ import {
 } from "@booking/common";
 import { pl } from "./logger";
 import Stripe from "stripe";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray, notInArray } from "drizzle-orm";
 import { countryCodes } from "./utils/country-iso-3166-1-alpha-2";
 import { upsertStripeCustomer } from "./utils/stripe";
 
@@ -36,10 +36,14 @@ const app = new Hono<{
   .get("/api/orders", (c) => {
     return c.text("Hello from orders service!");
   })
-  .get("/api/orders/admin/orders", requireAdmin, async (c) => {
-    const allOrders = await db.select().from(ordersTable);
-    return c.json({ orders: allOrders });
-  })
+  .get(
+    "/api/orders/admin/orders",
+    // requireAdmin,
+    async (c) => {
+      const allOrders = await db.select().from(ordersTable);
+      return c.json({ orders: allOrders });
+    },
+  )
   .post(
     "/api/orders/create-payment-intent/:orderId",
     requireAuth,
@@ -124,7 +128,7 @@ const app = new Hono<{
 
           const updated = await tx
             .update(ordersTable)
-            .set({ paymentIntent })
+            .set({ paymentIntent, status: OrderStatus.PAYMENT_INTENT_CREATED })
             .where(eq(ordersTable.id, order.id))
             .returning();
 
@@ -139,6 +143,7 @@ const app = new Hono<{
       }
     },
   )
+  // TODO: add zod validation to this route
   .get("/api/orders/pending", requireAuth, async (c) => {
     const currentUser = c.get("currentUser");
 
@@ -146,7 +151,11 @@ const app = new Hono<{
       where(fields, { eq, and }) {
         return and(
           eq(fields.userId, currentUser!.id),
-          eq(fields.status, OrderStatus.CREATED),
+          inArray(fields.status, [
+            OrderStatus.CREATED,
+            OrderStatus.PAYMENT_INTENT_CREATED,
+            OrderStatus.REQUIRES_PAYMENT_METHOD,
+          ]),
         );
       },
     });
@@ -156,6 +165,106 @@ const app = new Hono<{
     return c.json({
       order: pendingOrder || null,
     });
+  })
+  .get("/api/orders/:orderId/status", requireAuth, async (c) => {
+    const { orderId } = c.req.param();
+    const userId = c.get("currentUser")!.id;
+
+    const order = await db.query.ordersTable.findFirst({
+      where(fields, { eq, and }) {
+        return and(eq(fields.id, orderId), eq(fields.userId, userId));
+      },
+    });
+
+    if (!order) {
+      throw new HTTPException(404, {
+        res: new CustomErrorResponse({
+          message: "Order not found",
+        }),
+      });
+    }
+
+    const orderStatus = order.status;
+
+    const checkOrderStatus: Record<OrderStatus, boolean> =
+      // &  Record<Stripe.PaymentIntent.Status, boolean>
+      {
+        [OrderStatus.PAYMENT_INTENT_CREATED]: true,
+        [OrderStatus.REQUIRES_ACTION]: true,
+        [OrderStatus.PROCESSING]: true,
+        [OrderStatus.REQUIRES_CAPTURE]: true,
+        [OrderStatus.REQUIRES_CONFIRMATION]: true,
+        [OrderStatus.REQUIRES_PAYMENT_METHOD]: true,
+
+        // For created orders, we can consider them as pending and require user action to complete the order
+        [OrderStatus.CREATED]: false,
+
+        // For canceled, completed, and expired orders,
+        // we can consider them as final states where no further action is required
+        [OrderStatus.SUCCEEDED]: false,
+        [OrderStatus.CANCELED]: false,
+        [OrderStatus.EXPIRED]: false,
+      };
+
+    if (!checkOrderStatus[orderStatus]) {
+      return c.json({ order });
+    }
+
+    // fetch latest payment intent status from Stripe
+    if (!order.paymentIntent) {
+      pl.error(
+        { orderId },
+        "Order is in a pending state but missing payment intent",
+      );
+      throw new HTTPException(500, {
+        res: new CustomErrorResponse({
+          message: "Order is in a pending state but missing payment intent",
+        }),
+      });
+    }
+    const paymentIntent = await stripe.paymentIntents.retrieve(
+      order.paymentIntent.id,
+    );
+
+    pl.debug(
+      { checkOrderStatus, paymentIntentStatus: paymentIntent.status },
+      "Stripe payment intent status",
+    );
+
+    if (!(paymentIntent.status in checkOrderStatus)) {
+      pl.error(
+        { paymentIntent, paymentIntentStatus: paymentIntent.status },
+        `Unknown Stripe payment intent status ${paymentIntent.status} received`,
+      );
+      throw new HTTPException(500, {
+        res: new CustomErrorResponse({
+          message: `Unknown payment intent status ${paymentIntent.status}`,
+        }),
+      });
+    }
+
+    // update status in database if it has changed
+
+    const updatedOrder = await db
+      .update(ordersTable)
+      .set({
+        // status:
+        status: paymentIntent.status as OrderStatus,
+        paymentIntent,
+      })
+      .where(
+        and(
+          eq(ordersTable.id, orderId),
+          notInArray(ordersTable.status, [
+            OrderStatus.EXPIRED,
+            OrderStatus.CANCELED,
+            OrderStatus.SUCCEEDED,
+          ]),
+        ),
+      )
+      .returning();
+
+    return c.json({ order: updatedOrder });
   })
   .post("/api/orders/stripe-webhook", async (c) => {
     const endpointSecret = process.env.ORDERS_STRIPE_WEBHOOK_SECRET!;
@@ -211,14 +320,14 @@ const app = new Hono<{
       case "payment_intent.succeeded":
         pl.debug(event.data.object, "PaymentIntent succeeded webhook received");
 
-        // Update order status to COMPLETED
+        // Update order status to SUCCEEDED
         try {
           await db
             .update(ordersTable)
-            .set({ status: OrderStatus.COMPLETED })
+            .set({ status: OrderStatus.SUCCEEDED })
             .where(eq(ordersTable.id, orderId));
 
-          return c.status(200);
+          return c.json({ received: true });
         } catch (error) {
           pl.error(error, "Failed to update order status");
           throw new HTTPException(500, {
@@ -240,7 +349,7 @@ const app = new Hono<{
             .set({ status: OrderStatus.CANCELED })
             .where(eq(ordersTable.id, event.data.object.metadata.orderId));
 
-          return c.status(200);
+          return c.json({ received: true });
         } catch (error) {
           pl.error(error, "Failed to update order status");
           throw new HTTPException(500, {
@@ -257,7 +366,7 @@ const app = new Hono<{
             .update(ordersTable)
             .set({ status: OrderStatus.CANCELED })
             .where(eq(ordersTable.id, event.data.object.metadata.orderId));
-          return c.status(200);
+          return c.json({ received: true });
         } catch (error) {
           pl.error(error, "Failed to update order status");
           throw new HTTPException(500, {
@@ -276,7 +385,7 @@ const app = new Hono<{
             .update(ordersTable)
             .set({ status: OrderStatus.PROCESSING })
             .where(eq(ordersTable.id, event.data.object.metadata.orderId));
-          return c.status(200);
+          return c.json({ received: true });
         } catch (error) {
           pl.error(error, "Failed to update order status");
           throw new HTTPException(500, {
@@ -295,7 +404,7 @@ const app = new Hono<{
             .update(ordersTable)
             .set({ status: OrderStatus.REQUIRES_ACTION })
             .where(eq(ordersTable.id, event.data.object.metadata.orderId));
-          return c.status(200);
+          return c.json({ received: true });
         } catch (error) {
           pl.error(error, "Failed to update order status");
           throw new HTTPException(500, {
@@ -327,3 +436,5 @@ const app = new Hono<{
   });
 
 export { app };
+
+// TODO: add more stripe status to enums
