@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: orders-migration
 spec:
-  ttlSecondsAfterFinished: 100
+  # ttlSecondsAfterFinished: 100
   backoffLimit: 3
   template:
     spec:
