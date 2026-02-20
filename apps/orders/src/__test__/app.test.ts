@@ -124,6 +124,16 @@ describe("create payment intent for order", () => {
         param: {
           orderId,
         },
+        json: {
+          name: "John Doe",
+          address: {
+            line1: "123 Main St",
+            city: "San Francisco",
+            state: "CA",
+            postal_code: "94103",
+            country: "US",
+          },
+        },
       },
 
       {
