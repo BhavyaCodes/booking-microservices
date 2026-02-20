@@ -58,10 +58,16 @@ const main = async () => {
   });
 
   const cleanup = async () => {
-    notifClient.query("UNLISTEN outbox_insert").catch();
+    notifClient.query("UNLISTEN outbox_insert").catch((err) => {
+      pl.error(err, "Failed to unlisten outbox_insert");
+    });
     notifClient.release();
-    natsWrapper.nc.drain().catch();
-    pool.end().catch();
+    natsWrapper.nc.drain().catch((err) => {
+      pl.error(err, "Failed to drain NATS connection");
+    });
+    pool.end().catch((err) => {
+      pl.error(err, "Failed to end Postgres connection pool");
+    });
   };
 
   Bun.serve({
