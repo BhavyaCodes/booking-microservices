@@ -36,14 +36,10 @@ const app = new Hono<{
   .get("/api/orders", (c) => {
     return c.text("Hello from orders service!");
   })
-  .get(
-    "/api/orders/admin/orders",
-    // requireAdmin,
-    async (c) => {
-      const allOrders = await db.select().from(ordersTable);
-      return c.json({ orders: allOrders });
-    },
-  )
+  .get("/api/orders/admin/orders", requireAdmin, async (c) => {
+    const allOrders = await db.select().from(ordersTable);
+    return c.json({ orders: allOrders });
+  })
   .post(
     "/api/orders/create-payment-intent/:orderId",
     requireAuth,
