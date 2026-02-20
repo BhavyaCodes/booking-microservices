@@ -89,7 +89,9 @@ const app = new Hono<{
           const result = await tx
             .select()
             .from(ordersTable)
-            .where(eq(ordersTable.id, orderId))
+            .where(
+              and(eq(ordersTable.id, orderId), eq(ordersTable.userId, userId)),
+            )
             .for("update");
 
           if (result.length === 0) {
