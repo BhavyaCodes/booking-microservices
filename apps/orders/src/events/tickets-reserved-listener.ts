@@ -11,7 +11,7 @@ export class TicketsReservedListener extends BaseListener<TicketsReservedEvent> 
   readonly durableName = "orders-service-durable";
 
   async onMessage(msg: JsMsg) {
-    pl.trace(
+    pl.debug(
       { podName: process.env.POD_NAME, message: msg.json() },
       "TicketsReserved event received",
     );
