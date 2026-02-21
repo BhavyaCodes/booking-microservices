@@ -4,6 +4,7 @@ import { arrayOverlaps, and, notInArray } from "drizzle-orm";
 import { pl } from "../logger";
 import { db } from "../db";
 import { ordersTable, OrderStatus } from "../db/schema";
+import { expirationQueue } from "../queues/expiration-queue";
 
 export class TicketsReservedListener extends BaseListener<TicketsReservedEvent> {
   readonly subject = Subjects.TicketsReserved;
@@ -54,11 +55,29 @@ export class TicketsReservedListener extends BaseListener<TicketsReservedEvent> 
           return;
         }
 
-        const result = await tx.insert(ordersTable).values(dbData);
+        const insertedOrderArray = await tx
+          .insert(ordersTable)
+          .values(dbData)
+          .returning();
+
         pl.debug(
-          { result },
-          `Inserted ${result.rowCount} orders from TicketsReserved event`,
+          { result: insertedOrderArray },
+          `Inserted ${insertedOrderArray[0].id} orders from TicketsReserved event`,
         );
+
+        expirationQueue
+          .add(
+            {
+              orderId: insertedOrderArray[0].id,
+              ticketIds: data.ticketIds,
+            },
+            {
+              delay: new Date(data.expiresAt).getTime() - Date.now(),
+            },
+          )
+          .then((value) => {
+            pl.debug({ jobId: value.id }, "Added job to expiration queue");
+          });
       });
       msg.ack();
     } catch (error) {
