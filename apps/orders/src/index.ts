@@ -11,6 +11,10 @@ const main = async () => {
     throw new Error("JWT_KEY must be present");
   }
 
+  if (!process.env.REDIS_HOST) {
+    throw new Error("REDIS_HOST must be present");
+  }
+
   if (
     !process.env.ORDERS_STRIPE_SECRET_KEY ||
     !process.env.ORDERS_STRIPE_WEBHOOK_SECRET
