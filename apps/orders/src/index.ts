@@ -55,6 +55,20 @@ const main = async () => {
   await notifClient.query("LISTEN outbox_insert");
   pl.trace("🚀 ~ listening for outbox_insert notifications");
 
+  notifClient.on("notification", (msg) => {
+    pl.debug("Received pg notification");
+    if (msg.channel === "outbox_insert") {
+      pl.debug("Received outbox_insert notification, processing outbox events");
+      // outboxPublisher()
+      //   .catch((err) => {
+      //     pl.error(err, "Failed to process outbox events");
+      //   })
+      //   .finally(() => {
+      //     pl.debug("Finished processing outbox events");
+      //   });
+    }
+  });
+
   // notifClient.on("notification", (msg) => {
   //   if (msg.channel === "outbox_insert") {
   //     outboxPublisher().catch((err) => {
