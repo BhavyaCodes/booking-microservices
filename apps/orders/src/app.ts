@@ -19,11 +19,7 @@ import { pl } from "./logger";
 import Stripe from "stripe";
 import { and, eq, inArray, notInArray } from "drizzle-orm";
 import { countryCodes } from "./utils/country-iso-3166-1-alpha-2";
-import { upsertStripeCustomer } from "./utils/stripe";
-
-const stripe = new Stripe(process.env.ORDERS_STRIPE_SECRET_KEY!, {
-  apiVersion: "2026-01-28.clover",
-});
+import { stripe, upsertStripeCustomer } from "./utils/stripe";
 
 const app = new Hono<{
   Variables: {

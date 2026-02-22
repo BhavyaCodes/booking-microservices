@@ -1,8 +1,11 @@
 import Stripe from "stripe";
 import { pl } from "../logger";
 
+export const stripe = new Stripe(process.env.ORDERS_STRIPE_SECRET_KEY!, {
+  apiVersion: "2026-01-28.clover",
+});
 
-// TODO: refactor this as search api is not available in India 
+// TODO: refactor this as search api is not available in India
 
 // // Helper: Check if address differs from existing
 // export function isAddressChanged(
@@ -64,8 +67,8 @@ export async function upsertStripeCustomer(
   // const existingName = customers.data[0].name;
 
   // if (isAddressChanged(existingAddress, address) || existingName !== name) {
-    // await stripe.customers.update(customerId, { address, name });
-    // pl.debug({ customerId }, "Updated Stripe Customer");
+  // await stripe.customers.update(customerId, { address, name });
+  // pl.debug({ customerId }, "Updated Stripe Customer");
   // }
 
   const customer = await stripe.customers.create({
