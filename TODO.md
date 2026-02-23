@@ -50,6 +50,8 @@
   - [ ] s3 local
   - [ ] upload video
     - [ ] format video -> create multiple variants and improve encoding for web friendly
+- [ ] monitoring/logging (grafana?)
+
 
 ### NOTES
  - for stripe webhook -> kubectl port-forward service/orders-srv 3001:3000
