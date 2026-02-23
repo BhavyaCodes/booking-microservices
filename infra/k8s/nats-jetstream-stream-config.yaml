@@ -8,7 +8,7 @@ data:
   stream.json: |
     {
       "name": "booking",
-      "subjects": ["auth.*", "tickets.*"],
+      "subjects": ["orders.*", "tickets.*"],
       "description": "Booking events stream",
       "retention": "limits",
       "discard": "old",
