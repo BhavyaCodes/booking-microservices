@@ -7,6 +7,7 @@ import { db } from "../db";
 import { ordersTable, OrderStatus } from "../db/schema";
 import { eq } from "drizzle-orm/sql/expressions/conditions";
 import { stripe } from "../utils/stripe";
+import { addEventToOutBox } from "../outbox";
 
 const BULL_QUEUE_NAME = "order:expiration";
 
@@ -24,7 +25,7 @@ expirationQueue.whenCurrentJobsFinished().then(() => {
   pl.info("All current jobs in expiration queue have finished");
 });
 
-expirationQueue.process(async (job, done) => {
+expirationQueue.process(async (job) => {
   pl.info(
     {
       jobId: job.id,
@@ -41,86 +42,83 @@ expirationQueue.process(async (job, done) => {
     [OrderStatus.CANCELED]: "Order already canceled",
   };
 
-  await db.transaction(async (tx) => {
-    const orderArr = await tx
-      .select()
-      .from(ordersTable)
-      .where(
-        // and(
-        eq(ordersTable.id, job.data.orderId),
-        // notInArray(ordersTable.status, [
-        //   OrderStatus.EXPIRED,
-        //   OrderStatus.SUCCEEDED,
-        // ]),
-        // ),
-      )
-      .limit(1)
-      .for("update");
+  try {
+    await db.transaction(async (tx) => {
+      const orderArr = await tx
+        .select()
+        .from(ordersTable)
+        .where(
+          // and(
+          eq(ordersTable.id, job.data.orderId),
+          // notInArray(ordersTable.status, [
+          //   OrderStatus.EXPIRED,
+          //   OrderStatus.SUCCEEDED,
+          // ]),
+          // ),
+        )
+        .limit(1)
+        .for("update");
 
-    if (!orderArr[0]) {
-      pl.warn(
-        { orderId: job.data.orderId },
-        "Order not found for expiration job, skipping",
-      );
-      return;
-    }
-
-    const [order] = orderArr;
-
-    if (errorMessages[order.status]) {
-      pl.warn(
-        { orderId: job.data.orderId, status: order.status },
-        errorMessages[order.status],
-      );
-      return;
-    }
-
-    // if (orderArr[0].status === OrderStatus.EXPIRED) {
-    //   pl.warn(
-    //     { orderId: job.data.orderId },
-    //     "Order already expired for expiration job, skipping",
-    //   );
-    //   return;
-    // }
-
-    // if (orderArr[0].status === OrderStatus.SUCCEEDED) {
-    //   pl.info(
-    //     { orderId: job.data.orderId },
-    //     "Order already succeeded for expiration job, skipping",
-    //   );
-    //   return;
-    // }
-
-    if (!order.paymentIntent) {
-      await tx
-        .update(ordersTable)
-        .set({ status: OrderStatus.EXPIRED })
-        .where(eq(ordersTable.id, job.data.orderId));
-    } else {
-      // cancel payment intent with Stripe
-      const paymentIntentId = order.paymentIntent.id;
-
-      await stripe.paymentIntents.cancel(paymentIntentId).catch((err) => {
-        pl.error(
-          { err, paymentIntentId, orderId: job.data.orderId },
-          "Failed to cancel payment intent in Stripe",
+      if (!orderArr[0]) {
+        pl.warn(
+          { orderId: job.data.orderId },
+          "Order not found for expiration job, skipping",
         );
-        throw err;
-      });
+        return;
+      }
 
-      // update order status to expired
+      const [order] = orderArr;
 
-      // add retry logic for transient errors
+      if (errorMessages[order.status]) {
+        pl.warn(
+          { orderId: job.data.orderId, status: order.status },
+          errorMessages[order.status],
+        );
+        return;
+      }
 
-      // add event to outbox for eventual consistency with tickets service
-    }
-  });
+      if (!order.paymentIntent) {
+        await tx
+          .update(ordersTable)
+          .set({ status: OrderStatus.EXPIRED })
+          .where(eq(ordersTable.id, job.data.orderId));
 
-  // const pa = await orderExpiredPublisher(job.data).catch((err) => {
-  //   done(err);
-  // });
+        await addEventToOutBox(tx, {
+          subject: Subjects.OrderExpired,
+          data: job.data,
+        });
+      } else {
+        // cancel payment intent with Stripe
+        const paymentIntentId = order.paymentIntent.id;
 
-  // done(null, pa);
+        await stripe.paymentIntents.cancel(paymentIntentId).catch((err) => {
+          pl.error(
+            { err, paymentIntentId, orderId: job.data.orderId },
+            "Failed to cancel payment intent in Stripe",
+          );
+          throw err;
+        });
+
+        // update order status to expired
+
+        await tx
+          .update(ordersTable)
+          .set({ status: OrderStatus.EXPIRED })
+          .where(eq(ordersTable.id, job.data.orderId));
+
+        // TODO: add retry logic for transient errors
+
+        // add event to outbox for eventual consistency with tickets service
+        await addEventToOutBox(tx, {
+          subject: Subjects.OrderExpired,
+          data: job.data,
+        });
+      }
+    });
+  } catch (error) {
+    pl.error(error, "Error processing expiration job");
+    throw error;
+  }
 });
 
 export { expirationQueue };
