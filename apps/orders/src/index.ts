@@ -5,6 +5,7 @@ import { natsWrapper } from "./nats-wrapper";
 // import { outboxPublisher } from "./outbox";
 import { pl } from "./logger";
 import { TicketsReservedListener } from "./events/tickets-reserved-listener";
+import { outboxPublisher } from "./outbox";
 
 const main = async () => {
   if (!process.env.JWT_KEY) {
@@ -59,13 +60,13 @@ const main = async () => {
     pl.debug("Received pg notification");
     if (msg.channel === "outbox_insert") {
       pl.debug("Received outbox_insert notification, processing outbox events");
-      // outboxPublisher()
-      //   .catch((err) => {
-      //     pl.error(err, "Failed to process outbox events");
-      //   })
-      //   .finally(() => {
-      //     pl.debug("Finished processing outbox events");
-      //   });
+      outboxPublisher()
+        .catch((err) => {
+          pl.error(err, "Failed to process outbox events");
+        })
+        .finally(() => {
+          pl.debug("Finished processing outbox events");
+        });
     }
   });
 
