@@ -20,7 +20,7 @@ data:
       "durable_name": "tickets-service-durable",
       "description": "Durable consumer for tickets service",
       "stream_name": "booking",
-      "filter_subject": "tickets.*",
+      "filter_subjects": ["tickets.*", "orders.*"],
       "deliver_policy": "all",
       "ack_policy": "explicit",
       "replay_policy": "instant",
