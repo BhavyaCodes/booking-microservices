@@ -33,7 +33,7 @@ import { addEventToOutBox } from "./outbox";
 import { logger } from "hono/logger";
 import { pl } from "./logger";
 
-const EXPIRY_TIME_MINUTES = 15;
+const EXPIRY_TIME_MINUTES = 1;
 
 const app = new Hono<{
   Variables: {

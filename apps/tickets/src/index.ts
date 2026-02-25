@@ -2,9 +2,10 @@ import { db, pool } from "./db";
 import { app } from "./app";
 import { sql } from "drizzle-orm";
 import { natsWrapper } from "./nats-wrapper";
-// import { TicketCreatedListener } from "./events/ticket-created-listener";
 import { outboxPublisher } from "./outbox";
 import { pl } from "./logger";
+import { handleOrderExpired } from "./events/order-expired-handler";
+import { MessageDispatcher, Subjects } from "@booking/common";
 
 const main = async () => {
   if (!process.env.JWT_KEY) {
@@ -31,7 +32,13 @@ const main = async () => {
     process.exit(1);
   }
 
-  // new TicketCreatedListener(natsWrapper.js).listen();
+  const dispatcher = new MessageDispatcher(
+    natsWrapper.js,
+    "booking",
+    "tickets-service-durable",
+  );
+  dispatcher.on(Subjects.OrderExpired, handleOrderExpired);
+  dispatcher.listen();
 
   await db.execute(sql`SELECT 1`).catch((err) => {
     pl.fatal(err, "Failed to connect to Postgres");
