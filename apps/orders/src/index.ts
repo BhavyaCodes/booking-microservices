@@ -49,7 +49,10 @@ const main = async () => {
     "orders-service-durable",
   );
   dispatcher.on(Subjects.TicketsReserved, handleTicketsReserved);
-  dispatcher.listen();
+  dispatcher.listen().catch((error) => {
+    pl.fatal(error, "Failed to start message dispatcher");
+    process.exit(-1);
+  });
 
   await db.execute(sql`SELECT 1`).catch((error) => {
     pl.fatal(error, "Failed to connect to Postgres");
