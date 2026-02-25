@@ -79,14 +79,6 @@ const main = async () => {
     }
   });
 
-  // notifClient.on("notification", (msg) => {
-  //   if (msg.channel === "outbox_insert") {
-  //     outboxPublisher().catch((err) => {
-  //       pl.error(err, "Failed to process outbox events");
-  //     });
-  //   }
-  // });
-
   const cleanup = async () => {
     notifClient.query("UNLISTEN outbox_insert").catch((err) => {
       pl.error(err, "Failed to unlisten outbox_insert");

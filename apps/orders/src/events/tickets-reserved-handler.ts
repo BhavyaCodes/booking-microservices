@@ -60,19 +60,17 @@ export async function handleTicketsReserved(msg: JsMsg) {
         `Inserted ${insertedOrderArray[0].id} orders from TicketsReserved event`,
       );
 
-      expirationQueue
-        .add(
-          {
-            orderId: insertedOrderArray[0].id,
-            ticketIds: data.ticketIds,
-          },
-          {
-            delay: new Date(data.expiresAt).getTime() - Date.now(),
-          },
-        )
-        .then((value) => {
-          pl.debug({ jobId: value.id }, "Added job to expiration queue");
-        });
+      const job = await expirationQueue.add(
+        {
+          orderId: insertedOrderArray[0].id,
+          ticketIds: data.ticketIds,
+        },
+        {
+          delay: new Date(data.expiresAt).getTime() - Date.now(),
+        },
+      );
+
+      pl.debug({ jobId: job.id }, "Added job to expiration queue");
     });
     msg.ack();
   } catch (error) {
