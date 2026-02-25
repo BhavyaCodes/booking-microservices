@@ -14,7 +14,8 @@ export async function handleOrderExpired(msg: JsMsg) {
   const data = msg.json<OrderExpiredEvent["data"]>();
 
   try {
-    db.update(ticketsTable)
+    await db
+      .update(ticketsTable)
       .set({
         userId: null,
       })
@@ -23,6 +24,16 @@ export async function handleOrderExpired(msg: JsMsg) {
   } catch (error) {
     pl.error(error, "Error updating tickets");
 
-    // msg.ack();
+    const deliveryCount = msg.info?.deliveryCount ?? 0;
+    const MAX_REDELIVERIES = 5;
+    if (deliveryCount >= MAX_REDELIVERIES) {
+      pl.error(
+        { deliveryCount: deliveryCount },
+        "Max redeliveries reached for OrderExpired event, acknowledging message to prevent further retries",
+      );
+      msg.ack();
+    } else {
+      msg.nak(5000); // wait 5 seconds before redelivery
+    }
   }
 }
