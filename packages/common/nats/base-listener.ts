@@ -42,6 +42,7 @@ export class MessageDispatcher {
             { subject: msg.subject, stream: this.stream },
             "No handler registered for subject, acking to prevent redelivery",
           );
+          // TODO: consider sending to a dead letter queue instead
           msg.ack();
         }
       },

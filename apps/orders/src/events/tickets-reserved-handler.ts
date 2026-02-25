@@ -39,15 +39,13 @@ export async function handleTicketsReserved(msg: JsMsg) {
         .limit(1);
 
       if (overlaps.length > 0) {
-        pl.warn(
+        pl.error(
           { conflictOrderId: overlaps[0].id, ticketIds: data.ticketIds },
           "Rejecting TicketsReserved: one or more tickets already reserved",
         );
         // Business rule violation – acknowledge to stop retries.
         // TODO: use msg.term()
-        msg.ack();
-        tx.rollback();
-        return;
+        throw new Error("One or more tickets are already reserved");
       }
 
       const insertedOrderArray = await tx
