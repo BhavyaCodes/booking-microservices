@@ -1,4 +1,4 @@
-import { NATSEvent, OrderExpiredEvent, Subjects } from "@booking/common";
+import { OrderExpiredEvent, Subjects } from "@booking/common";
 import { natsWrapper } from "../nats-wrapper";
 
 export const orderExpiredPublisher = async (
