@@ -49,7 +49,7 @@ const main = async () => {
     "orders-service-durable",
   );
   dispatcher.on(Subjects.TicketsReserved, handleTicketsReserved);
-  dispatcher.listen().catch((error) => {
+  await dispatcher.listen().catch((error) => {
     pl.fatal(error, "Failed to start message dispatcher");
     process.exit(-1);
   });
