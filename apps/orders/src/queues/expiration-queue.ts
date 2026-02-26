@@ -15,6 +15,15 @@ const expirationQueue = new Bull<OrderExpiredEvent["data"]>(BULL_QUEUE_NAME, {
   redis: {
     host: process.env.REDIS_HOST,
   },
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: {
+      type: "exponential",
+      delay: 1000,
+    },
+    removeOnComplete: true,
+    removeOnFail: false,
+  },
 });
 
 expirationQueue.on("error", (err) => {
@@ -69,8 +78,9 @@ expirationQueue.process(async (job) => {
 
       const [order] = orderArr;
 
+      // Orders that are already expired, succeeded, or canceled should not be processed for expiration again
       if (errorMessages[order.status]) {
-        pl.warn(
+        pl.info(
           { orderId: job.data.orderId, status: order.status },
           errorMessages[order.status],
         );
@@ -96,6 +106,9 @@ expirationQueue.process(async (job) => {
             { err, paymentIntentId, orderId: job.data.orderId },
             "Failed to cancel payment intent in Stripe",
           );
+
+          // TODO: handle this error better
+
           throw err;
         });
 
