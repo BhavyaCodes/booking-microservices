@@ -21,6 +21,10 @@
 - [ ] add name to seatCategory table
 - [x] update names for waiting jobs
 
+### Tickets src
+ - [ ] update logic for user not being able to create two orders
+   - [ ] can be done by adding additional params to ticket fields or creating new table
+
 ### Orders srv
 #### payments
  - [x] create payment intent
@@ -31,7 +35,8 @@
   - [x] failed/cancelled 
  - [ ] handle db after failure
  - [ ] emit events after webhook/status update of order
-
+ - [x] replace bulljs with bullmq
+ 
 #### Expiration of orders
  - [ ] integrate bulljs
  - [ ] send expired event

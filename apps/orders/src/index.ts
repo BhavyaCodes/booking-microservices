@@ -7,6 +7,7 @@ import { pl } from "./logger";
 import { handleTicketsReserved } from "./events/tickets-reserved-handler";
 import { outboxPublisher } from "./outbox";
 import { MessageDispatcher, Subjects } from "@booking/common";
+import { expirationWorker } from "./queues/expiration-queue";
 
 const main = async () => {
   if (!process.env.JWT_KEY) {
@@ -78,6 +79,13 @@ const main = async () => {
         });
     }
   });
+
+  if (!expirationWorker.isRunning()) {
+    expirationWorker.run().catch((err) => {
+      pl.fatal(err, "Failed to start expiration worker");
+      process.exit(-1);
+    });
+  }
 
   const cleanup = async () => {
     notifClient.query("UNLISTEN outbox_insert").catch((err) => {

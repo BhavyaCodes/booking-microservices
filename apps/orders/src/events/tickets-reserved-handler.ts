@@ -4,7 +4,10 @@ import { arrayOverlaps, and, notInArray } from "drizzle-orm";
 import { pl } from "../logger";
 import { db } from "../db";
 import { ordersTable, OrderStatus } from "../db/schema";
-import { expirationQueue } from "../queues/expiration-queue";
+import {
+  bullQueue,
+  EXPIRATION_BULL_QUEUE_NAME,
+} from "../queues/expiration-queue";
 
 export async function handleTicketsReserved(msg: JsMsg) {
   pl.debug(
@@ -58,13 +61,15 @@ export async function handleTicketsReserved(msg: JsMsg) {
         `Inserted ${insertedOrderArray[0].id} orders from TicketsReserved event`,
       );
 
-      const job = await expirationQueue.add(
+      const job = await bullQueue.add(
+        EXPIRATION_BULL_QUEUE_NAME,
         {
           orderId: insertedOrderArray[0].id,
           ticketIds: data.ticketIds,
         },
         {
           delay: new Date(data.expiresAt).getTime() - Date.now(),
+          jobId: insertedOrderArray[0].id, // Use order ID as job ID for easy correlation
         },
       );
 
