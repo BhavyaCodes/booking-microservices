@@ -10,10 +10,10 @@ import { eq } from "drizzle-orm/sql/expressions/conditions";
 import { stripe } from "../utils/stripe";
 import { addEventToOutBox } from "../outbox";
 
-export const EXPIRATION_BULL_QUEUE_NAME = "order-expiration";
+export const PROCESS_ORDER_QUEUE = "order-process";
 
 export const bullQueue = new Queue<OrderExpiredEvent["data"]>(
-  EXPIRATION_BULL_QUEUE_NAME,
+  PROCESS_ORDER_QUEUE,
   {
     connection: {
       host: process.env.REDIS_HOST,
@@ -35,7 +35,7 @@ bullQueue.on("error", (err) => {
 });
 
 export const expirationWorker = new Worker(
-  EXPIRATION_BULL_QUEUE_NAME,
+  PROCESS_ORDER_QUEUE,
   async (job) => {
     pl.info(
       {
