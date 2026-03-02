@@ -20,6 +20,7 @@ import Stripe from "stripe";
 import { and, eq, inArray, notInArray } from "drizzle-orm";
 import { countryCodes } from "./utils/country-iso-3166-1-alpha-2";
 import { stripe, upsertStripeCustomer } from "./utils/stripe";
+import { bullQueue } from "./queues/expiration-queue";
 
 const app = new Hono<{
   Variables: {
@@ -316,10 +317,14 @@ const app = new Hono<{
 
         // Update order status to SUCCEEDED
         try {
-          await db
-            .update(ordersTable)
-            .set({ status: OrderStatus.SUCCEEDED })
-            .where(eq(ordersTable.id, orderId));
+          db.transaction(async (tx) => {
+            await tx
+              .update(ordersTable)
+              .set({ status: OrderStatus.SUCCEEDED })
+              .where(eq(ordersTable.id, orderId));
+
+            await bullQueue.remove(orderId); // Remove any pending expiration job for this order
+          });
 
           return c.json({ received: true });
         } catch (error) {
@@ -338,10 +343,36 @@ const app = new Hono<{
         );
 
         try {
-          await db
-            .update(ordersTable)
-            .set({ status: OrderStatus.CANCELED })
-            .where(eq(ordersTable.id, event.data.object.metadata.orderId));
+          await db.transaction(async (tx) => {
+            await tx
+              .update(ordersTable)
+              .set({ status: OrderStatus.CANCELED })
+              .where(eq(ordersTable.id, event.data.object.metadata.orderId));
+
+            const job = await bullQueue.getJob(
+              event.data.object.metadata.orderId,
+            );
+
+            pl.debug({ job }, "Fetched expiration job for failed payment");
+
+            if (job && job.delay) {
+              pl.debug(
+                { orderId: event.data.object.metadata.orderId },
+                "Delaying expiration job for failed payment",
+              );
+              await job.changeDelay(0);
+
+              pl.debug(
+                { orderId: event.data.object.metadata.orderId },
+                "Expiration job delay changed to 0 for failed payment",
+              );
+            } else {
+              pl.warn(
+                { orderId: event.data.object.metadata.orderId },
+                "No pending expiration job found for failed payment, skipping",
+              );
+            }
+          });
 
           return c.json({ received: true });
         } catch (error) {
@@ -356,10 +387,33 @@ const app = new Hono<{
       case "payment_intent.canceled":
         pl.debug(event.data.object, "PaymentIntent canceled webhook received");
         try {
-          await db
-            .update(ordersTable)
-            .set({ status: OrderStatus.CANCELED })
-            .where(eq(ordersTable.id, event.data.object.metadata.orderId));
+          await db.transaction(async (tx) => {
+            await tx
+              .update(ordersTable)
+              .set({ status: OrderStatus.CANCELED })
+              .where(eq(ordersTable.id, event.data.object.metadata.orderId));
+
+            const job = await bullQueue.getJob(
+              event.data.object.metadata.orderId,
+            );
+
+            pl.debug({ job }, "Fetched expiration job for canceled payment");
+
+            if (job && job.delay) {
+              await job.changeDelay(0);
+
+              pl.debug(
+                { orderId: event.data.object.metadata.orderId },
+                " Expediting expiration job for canceled payment",
+              );
+            } else {
+              pl.warn(
+                { orderId: event.data.object.metadata.orderId },
+                "No pending expiration job found for canceled payment, skipping",
+              );
+            }
+          });
+
           return c.json({ received: true });
         } catch (error) {
           pl.error(error, "Failed to update order status");

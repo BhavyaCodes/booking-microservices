@@ -50,7 +50,7 @@ export const expirationWorker = new Worker(
     const errorMessages: Partial<Record<OrderStatus, string>> = {
       [OrderStatus.EXPIRED]: "Order already expired",
       [OrderStatus.SUCCEEDED]: "Order already succeeded",
-      [OrderStatus.CANCELED]: "Order already canceled",
+      // [OrderStatus.CANCELED]: "Order already canceled",
     };
 
     try {
