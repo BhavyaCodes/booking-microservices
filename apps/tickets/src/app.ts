@@ -255,6 +255,13 @@ const app = new Hono<{
       return c.json(result, 200);
     },
   )
+  .get("/api/tickets/events", async (c) => {
+    const events = await db.query.eventsTable.findMany({
+      where: (eventsTable, { eq }) => eq(eventsTable.draft, false),
+    });
+
+    return c.json(events, 200);
+  })
   //TODO: add get event endpoints
   // seat categories routes
   .post(
