@@ -1,0 +1,1 @@
+ALTER TABLE "orders" ADD COLUMN "expiry_queue_processed" boolean DEFAULT false NOT NULL;

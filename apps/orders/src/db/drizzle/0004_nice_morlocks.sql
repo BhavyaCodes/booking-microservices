@@ -1,0 +1,1 @@
+ALTER TABLE "orders" RENAME COLUMN "expiry_queue_processed" TO "orders_queue_processed";

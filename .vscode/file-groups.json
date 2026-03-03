@@ -8,8 +8,8 @@
       "color": "",
       "files": [
         {
-          "path": "apps/orders/src/queues/expiration-queue.ts",
-          "name": "expiration-queue.ts",
+          "path": "apps/orders/src/queues/order-process-queue.ts",
+          "name": "order-process-queue.ts",
           "isDirectory": false
         },
         {
@@ -25,7 +25,7 @@
       ],
       "order": 0,
       "createdBy": "bhavya",
-      "collapsed": false,
+      "collapsed": true,
       "pinned": false,
       "isGlobal": false
     }

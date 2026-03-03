@@ -63,6 +63,7 @@ export const ordersTable = pgTable(
     paymentIntent: jsonb()
       .default(null)
       .$type<Stripe.Response<Stripe.PaymentIntent>>(),
+    expiryQueueProcessed: boolean().notNull().default(false),
   },
   (table) => [
     index("ticket_ids_idx").using("gin", table.ticketIds),
