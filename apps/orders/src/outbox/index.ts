@@ -73,7 +73,10 @@ export const outboxPublisher = async () => {
     });
 };
 
-export const addEventToOutBox = async (tx: OrdersTxn, event: NATSEvent) => {
+export const addEventToOutBox = async <T extends NATSEvent = NATSEvent>(
+  tx: OrdersTxn,
+  event: T,
+) => {
   await tx.insert(outboxTable).values({
     subject: event.subject,
     data: event.data,
