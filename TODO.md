@@ -36,12 +36,16 @@
  - [ ] handle db after failure
  - [ ] emit events after webhook/status update of order
  - [x] replace bulljs with bullmq
- 
+##### Later
+ - [ ] use a different queue for when payment is processing
+
 #### Expiration of orders
  - [ ] integrate bulljs
  - [ ] send expired event
+
 #### Client
  - [ ] don't use stripe client secret in url
+ 
 ## Later
 
 - [x] error helper to make HTTP error payload same across the app

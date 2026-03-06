@@ -7,7 +7,7 @@ import { pl } from "./logger";
 import { handleTicketsReserved } from "./events/tickets-reserved-handler";
 import { outboxPublisher } from "./outbox";
 import { MessageDispatcher, Subjects } from "@booking/common";
-import { expirationWorker } from "./queues/expiration-queue";
+import { expirationWorker } from "./queues/order-process-queue";
 
 const main = async () => {
   if (!process.env.JWT_KEY) {
