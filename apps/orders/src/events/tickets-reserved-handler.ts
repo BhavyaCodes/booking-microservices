@@ -1,13 +1,10 @@
 import type { TicketsReservedEvent } from "@booking/common";
 import type { JsMsg } from "@nats-io/jetstream/lib/jsmsg";
-import { arrayOverlaps, and, notInArray } from "drizzle-orm";
+import { arrayOverlaps, and, notInArray, ne, or, eq } from "drizzle-orm";
 import { pl } from "../logger";
 import { db } from "../db";
 import { ordersTable, OrderStatus } from "../db/schema";
-import {
-  bullQueue,
-  EXPIRATION_BULL_QUEUE_NAME,
-} from "../queues/expiration-queue";
+import { bullQueue, PROCESS_ORDER_QUEUE } from "../queues/order-process-queue";
 
 export async function handleTicketsReserved(msg: JsMsg) {
   pl.debug(
@@ -33,10 +30,10 @@ export async function handleTicketsReserved(msg: JsMsg) {
         .where(
           and(
             arrayOverlaps(ordersTable.ticketIds, data.ticketIds),
-            notInArray(ordersTable.status, [
-              OrderStatus.CANCELED,
-              OrderStatus.EXPIRED,
-            ]),
+            or(
+              eq(ordersTable.status, OrderStatus.SUCCEEDED),
+              eq(ordersTable.ordersQueueProcessed, false),
+            ),
           ),
         )
         .limit(1);
@@ -62,9 +59,8 @@ export async function handleTicketsReserved(msg: JsMsg) {
       );
 
       const job = await bullQueue.add(
-        EXPIRATION_BULL_QUEUE_NAME,
+        PROCESS_ORDER_QUEUE,
         {
-          orderId: insertedOrderArray[0].id,
           ticketIds: data.ticketIds,
         },
         {
