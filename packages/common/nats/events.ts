@@ -1,4 +1,4 @@
-import type { DateISOString } from "../interfaces";
+import type { DateISOString, UuidString } from "../interfaces";
 import { Subjects } from "./subjects";
 
 export type TicketsReservedEvent = {
@@ -16,7 +16,7 @@ export type TicketsReservedEvent = {
 export type OrderExpiredEvent = {
   subject: Subjects.OrderExpired;
   data: {
-    orderId: string;
+    orderId: UuidString;
     ticketIds: string[];
   };
 };
