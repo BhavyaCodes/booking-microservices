@@ -1,8 +1,8 @@
 // import Bull = require("bull");
-import { Queue, Worker } from "bullmq";
+import { DelayedError, Queue, Worker } from "bullmq";
 import { pl } from "../logger";
 
-import { OrderExpiredEvent, Subjects } from "@booking/common";
+import { Subjects } from "@booking/common";
 // import { orderExpiredPublisher } from "../events/order-expired-publisher";
 import { db } from "../db";
 import { ordersTable, OrderStatus } from "../db/schema";
@@ -12,67 +12,69 @@ import { addEventToOutBox } from "../outbox";
 
 export const PROCESS_ORDER_QUEUE = "order-process";
 
-export const bullQueue = new Queue<OrderExpiredEvent["data"]>(
-  PROCESS_ORDER_QUEUE,
-  {
-    connection: {
-      host: process.env.REDIS_HOST,
+type JobData = {
+  ticketIds: string[];
+};
+
+export const bullQueue = new Queue<JobData>(PROCESS_ORDER_QUEUE, {
+  connection: {
+    host: process.env.REDIS_HOST,
+  },
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: {
+      type: "exponential",
+      delay: 1000,
     },
-    defaultJobOptions: {
-      attempts: 3,
-      backoff: {
-        type: "exponential",
-        delay: 1000,
-      },
-      removeOnComplete: true,
-      removeOnFail: false,
+    removeOnComplete: {
+      age: 60 * 60 * 24, // 1 day
+    },
+    removeOnFail: {
+      age: 60 * 60 * 24 * 7, // 1 week
     },
   },
-);
+});
 
 bullQueue.on("error", (err) => {
   pl.error(err, "Error in expiration queue");
 });
 
-export const expirationWorker = new Worker(
+export const expirationWorker = new Worker<JobData>(
   PROCESS_ORDER_QUEUE,
   async (job) => {
     pl.info(
       {
-        jobId: job.id,
-        orderId: job.data?.orderId,
-        ticketIds: job.data?.ticketIds,
+        jobId: job.id, // also orderId
+        ticketIds: job.data.ticketIds,
         queueName: job.queueName,
       },
       "Processing expiration job",
     );
 
-    const errorMessages: Partial<Record<OrderStatus, string>> = {
-      [OrderStatus.EXPIRED]: "Order already expired",
-      [OrderStatus.SUCCEEDED]: "Order already succeeded",
-      // [OrderStatus.CANCELED]: "Order already canceled",
-    };
+    // To make typescript happy about job.id, we need to check if it's undefined,
+    // even though in our usage it should always be defined as we set
+    // it to orderId when adding the job to the queue
+    if (!job.id) {
+      pl.error(
+        { jobId: job.id, ticketIds: job.data.ticketIds },
+        "Job ID is missing, cannot process expiration job",
+      );
+      throw new Error("Job ID is missing");
+    }
+
+    const orderId = job.id;
 
     try {
       await db.transaction(async (tx) => {
         const orderArr = await tx
           .select()
           .from(ordersTable)
-          .where(
-            // and(
-            eq(ordersTable.id, job.data.orderId),
-            // notInArray(ordersTable.status, [
-            //   OrderStatus.EXPIRED,
-            //   OrderStatus.SUCCEEDED,
-            // ]),
-            // ),
-          )
-          .limit(1)
+          .where(eq(ordersTable.id, orderId))
           .for("update");
 
         if (!orderArr[0]) {
           pl.warn(
-            { orderId: job.data.orderId },
+            { orderId: orderId },
             "Order not found for expiration job, skipping",
           );
           return;
@@ -80,24 +82,48 @@ export const expirationWorker = new Worker(
 
         const [order] = orderArr;
 
-        // Orders that are already expired, succeeded, or canceled should not be processed for expiration again
-        if (errorMessages[order.status]) {
+        if (order.ordersQueueProcessed) {
           pl.info(
-            { orderId: job.data.orderId, status: order.status },
-            errorMessages[order.status],
+            { orderId: orderId, status: order.status },
+            "Order already expired, skipping expiration processing",
           );
           return;
         }
 
+        if (order.status === OrderStatus.SUCCEEDED) {
+          pl.debug(
+            "send order succeeded event to outbox for orderId:" + order.id,
+          );
+          await tx
+            .update(ordersTable)
+            .set({ ordersQueueProcessed: true })
+            .where(eq(ordersTable.id, orderId));
+
+          // TODO: send order succeeded event to outbox for eventual consistency with tickets service
+          pl.debug(
+            "============ Adding OrderSucceeded event to outbox for orderId:" +
+              order.id,
+          );
+          return;
+        }
+
+        // Orders that are already expired, succeeded, or canceled should not be processed for expiration again
+
         if (!order.paymentIntent) {
           await tx
             .update(ordersTable)
-            .set({ status: OrderStatus.EXPIRED })
-            .where(eq(ordersTable.id, job.data.orderId));
+            .set({
+              status: OrderStatus.EXPIRED,
+              ordersQueueProcessed: true,
+            })
+            .where(eq(ordersTable.id, orderId));
 
           await addEventToOutBox(tx, {
             subject: Subjects.OrderExpired,
-            data: job.data,
+            data: {
+              orderId,
+              ticketIds: job.data.ticketIds,
+            },
           });
         } else {
           // cancel payment intent with Stripe
@@ -105,28 +131,37 @@ export const expirationWorker = new Worker(
 
           await stripe.paymentIntents.cancel(paymentIntentId).catch((err) => {
             pl.error(
-              { err, paymentIntentId, orderId: job.data.orderId },
+              { err, paymentIntentId, orderId: orderId },
               "Failed to cancel payment intent in Stripe",
             );
 
+            const noOfAttempts = job.attemptsMade + 1; // attemptsMade is zero-indexed
+
+            // set custom backoff delay for retry based on number of attempts
+            const delayInMs = 1000 * 10 ** noOfAttempts;
+
+            job.moveToDelayed(Date.now() + delayInMs);
             // TODO: handle this error better
 
-            throw err;
+            throw new DelayedError(
+              `Failed to cancel payment intent in Stripe, retrying in ${delayInMs / 1000} seconds`,
+            );
           });
 
           // update order status to expired
 
           await tx
             .update(ordersTable)
-            .set({ status: OrderStatus.EXPIRED })
-            .where(eq(ordersTable.id, job.data.orderId));
-
-          // TODO: add retry logic for transient errors
+            .set({ status: OrderStatus.EXPIRED, ordersQueueProcessed: true })
+            .where(eq(ordersTable.id, orderId));
 
           // add event to outbox for eventual consistency with tickets service
           await addEventToOutBox(tx, {
             subject: Subjects.OrderExpired,
-            data: job.data,
+            data: {
+              orderId,
+              ticketIds: job.data.ticketIds,
+            },
           });
         }
       });
