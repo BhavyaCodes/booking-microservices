@@ -20,7 +20,7 @@ import Stripe from "stripe";
 import { and, eq, inArray, notInArray } from "drizzle-orm";
 import { countryCodes } from "./utils/country-iso-3166-1-alpha-2";
 import { stripe, upsertStripeCustomer } from "./utils/stripe";
-import { bullQueue } from "./queues/expiration-queue";
+import { bullQueue } from "./queues/order-process-queue";
 
 const app = new Hono<{
   Variables: {
@@ -316,14 +316,74 @@ const app = new Hono<{
         pl.debug(event.data.object, "PaymentIntent succeeded webhook received");
 
         // Update order status to SUCCEEDED
+        // NOTE: job.promote() is inside the transaction intentionally.
+        // The worker uses SELECT...FOR UPDATE on the order row, so it will
+        // block until this transaction commits — guaranteeing it reads
+        // the committed SUCCEEDED status. If promote() fails, the
+        // transaction rolls back.
         try {
-          db.transaction(async (tx) => {
+          await db.transaction(async (tx) => {
+            const orderArr = await tx
+              .select()
+              .from(ordersTable)
+              .where(eq(ordersTable.id, orderId))
+              .for("update");
+
+            if (!orderArr[0]) {
+              pl.warn({ orderId }, "Order not found for succeeded webhook");
+              return;
+            }
+
+            const [order] = orderArr;
+
+            // Expired state, shouldn't happen orders get cancelled before they get expired by bull queue,
+            // this is a failsafe
+            // In that case, we should not update the order status to succeeded
+            if (
+              order.status === OrderStatus.EXPIRED ||
+              order.status === OrderStatus.SUCCEEDED
+            ) {
+              pl.error(
+                { orderId, status: order.status },
+                "Order already in terminal state, skipping succeeded webhook",
+              );
+              return;
+            }
+
             await tx
               .update(ordersTable)
               .set({ status: OrderStatus.SUCCEEDED })
               .where(eq(ordersTable.id, orderId));
 
-            await bullQueue.remove(orderId); // Remove any pending expiration job for this order
+            const job = await bullQueue.getJob(orderId);
+
+            pl.debug({ job }, "Fetched expiration job for successful payment");
+
+            if (!job) {
+              pl.error(
+                { orderId },
+                "No pending job found for successful payment, skipping",
+              );
+              return;
+            }
+
+            const jobState = await job.getState();
+
+            if (jobState === "completed") {
+              return;
+            }
+
+            if (jobState === "failed") {
+              pl.error(
+                { orderId },
+                "Expiration job is in failed state for successful payment, this should not happen",
+              );
+              return;
+            }
+
+            if (jobState === "delayed") {
+              await job.promote();
+            }
           });
 
           return c.json({ received: true });
@@ -344,33 +404,53 @@ const app = new Hono<{
 
         try {
           await db.transaction(async (tx) => {
+            const orderArr = await tx
+              .select()
+              .from(ordersTable)
+              .where(eq(ordersTable.id, orderId))
+              .for("update");
+
+            if (!orderArr[0]) {
+              pl.warn(
+                { orderId },
+                "Order not found for payment_failed webhook",
+              );
+              return;
+            }
+
             await tx
               .update(ordersTable)
               .set({ status: OrderStatus.CANCELED })
-              .where(eq(ordersTable.id, event.data.object.metadata.orderId));
+              .where(eq(ordersTable.id, orderId));
 
-            const job = await bullQueue.getJob(
-              event.data.object.metadata.orderId,
-            );
+            const job = await bullQueue.getJob(orderId);
 
             pl.debug({ job }, "Fetched expiration job for failed payment");
 
-            if (job && job.delay) {
-              pl.debug(
-                { orderId: event.data.object.metadata.orderId },
-                "Delaying expiration job for failed payment",
+            if (!job) {
+              pl.error(
+                { orderId },
+                "No pending job found for failed payment, skipping",
               );
-              await job.changeDelay(0);
+              return;
+            }
 
-              pl.debug(
-                { orderId: event.data.object.metadata.orderId },
-                "Expiration job delay changed to 0 for failed payment",
+            const jobState = await job.getState();
+
+            if (jobState === "completed") {
+              return;
+            }
+
+            if (jobState === "failed") {
+              pl.error(
+                { orderId },
+                "Expiration job is in failed state for failed payment, this should not happen",
               );
-            } else {
-              pl.warn(
-                { orderId: event.data.object.metadata.orderId },
-                "No pending expiration job found for failed payment, skipping",
-              );
+              return;
+            }
+
+            if (jobState === "delayed") {
+              await job.promote();
             }
           });
 
@@ -388,14 +468,37 @@ const app = new Hono<{
         pl.debug(event.data.object, "PaymentIntent canceled webhook received");
         try {
           await db.transaction(async (tx) => {
+            const orderArr = await tx
+              .select()
+              .from(ordersTable)
+              .where(eq(ordersTable.id, orderId))
+              .for("update");
+
+            if (!orderArr[0]) {
+              pl.warn({ orderId }, "Order not found for canceled webhook");
+              return;
+            }
+
+            const terminalStatuses: OrderStatus[] = [
+              OrderStatus.EXPIRED,
+              OrderStatus.CANCELED,
+              OrderStatus.SUCCEEDED,
+            ];
+
+            if (terminalStatuses.includes(orderArr[0].status)) {
+              pl.info(
+                { orderId, status: orderArr[0].status },
+                "Order already in terminal state, skipping canceled webhook",
+              );
+              return;
+            }
+
             await tx
               .update(ordersTable)
               .set({ status: OrderStatus.CANCELED })
-              .where(eq(ordersTable.id, event.data.object.metadata.orderId));
+              .where(eq(ordersTable.id, orderId));
 
-            const job = await bullQueue.getJob(
-              event.data.object.metadata.orderId,
-            );
+            const job = await bullQueue.getJob(orderId);
 
             pl.debug({ job }, "Fetched expiration job for canceled payment");
 
@@ -403,12 +506,12 @@ const app = new Hono<{
               await job.changeDelay(0);
 
               pl.debug(
-                { orderId: event.data.object.metadata.orderId },
-                " Expediting expiration job for canceled payment",
+                { orderId },
+                "Expediting expiration job for canceled payment",
               );
             } else {
               pl.warn(
-                { orderId: event.data.object.metadata.orderId },
+                { orderId },
                 "No pending expiration job found for canceled payment, skipping",
               );
             }
@@ -429,10 +532,40 @@ const app = new Hono<{
           "PaymentIntent processing webhook received",
         );
         try {
-          await db
-            .update(ordersTable)
-            .set({ status: OrderStatus.PROCESSING })
-            .where(eq(ordersTable.id, event.data.object.metadata.orderId));
+          await db.transaction(async (tx) => {
+            const orderArr = await tx
+              .select()
+              .from(ordersTable)
+              .where(eq(ordersTable.id, orderId))
+              .for("update");
+
+            if (!orderArr[0]) {
+              pl.warn({ orderId }, "Order not found for canceled webhook");
+              return;
+            }
+
+            const [order] = orderArr;
+
+            const terminalStatuses: OrderStatus[] = [
+              OrderStatus.EXPIRED,
+              OrderStatus.CANCELED,
+              OrderStatus.SUCCEEDED,
+            ];
+
+            if (terminalStatuses.includes(order.status)) {
+              pl.info(
+                { orderId, status: order.status },
+                "Order already in terminal state, skipping processing webhook",
+              );
+              return;
+            }
+
+            await tx
+              .update(ordersTable)
+              .set({ status: OrderStatus.PROCESSING })
+              .where(eq(ordersTable.id, orderId));
+          });
+
           return c.json({ received: true });
         } catch (error) {
           pl.error(error, "Failed to update order status");
@@ -448,10 +581,44 @@ const app = new Hono<{
           "PaymentIntent requires_action webhook received",
         );
         try {
-          await db
-            .update(ordersTable)
-            .set({ status: OrderStatus.REQUIRES_ACTION })
-            .where(eq(ordersTable.id, event.data.object.metadata.orderId));
+          await db.transaction(async (tx) => {
+            const orderArr = await tx
+              .select()
+              .from(ordersTable)
+              .where(eq(ordersTable.id, orderId))
+              .for("update");
+
+            if (!orderArr[0]) {
+              pl.warn(
+                { orderId },
+                "Order not found for requires_action webhook",
+              );
+              return;
+            }
+
+            const [order] = orderArr;
+
+            const futureStatuses: OrderStatus[] = [
+              OrderStatus.EXPIRED,
+              OrderStatus.CANCELED,
+              OrderStatus.SUCCEEDED,
+              OrderStatus.PROCESSING,
+            ];
+
+            if (futureStatuses.includes(order.status)) {
+              pl.info(
+                { orderId, status: order.status },
+                "Order already in future/terminal state, skipping requires_action webhook",
+              );
+              return;
+            }
+
+            await tx
+              .update(ordersTable)
+              .set({ status: OrderStatus.REQUIRES_ACTION })
+              .where(eq(ordersTable.id, orderId));
+          });
+
           return c.json({ received: true });
         } catch (error) {
           pl.error(error, "Failed to update order status");
@@ -462,7 +629,7 @@ const app = new Hono<{
           });
         }
       default:
-        pl.warn(
+        pl.error(
           event.data.object,
           `Unhandled event type ${event.type} received`,
         );
@@ -486,3 +653,4 @@ const app = new Hono<{
 export { app };
 
 // TODO: add more stripe status to enums
+// TODO: handle active status of bull job
