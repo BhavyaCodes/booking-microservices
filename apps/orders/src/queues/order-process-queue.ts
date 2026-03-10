@@ -99,9 +99,16 @@ export const expirationWorker = new Worker<JobData>(
             .set({ ordersQueueProcessed: true })
             .where(eq(ordersTable.id, orderId));
 
-          // TODO: send order succeeded event to outbox for eventual consistency with tickets service
+          await addEventToOutBox(tx, {
+            subject: Subjects.OrderConfirmed,
+            data: {
+              orderId,
+              ticketIds: job.data.ticketIds,
+            },
+          });
+
           pl.debug(
-            "============ Adding OrderSucceeded event to outbox for orderId:" +
+            "Order already succeeded, marked as processed and sent OrderConfirmed event to outbox for orderId: " +
               order.id,
           );
           return;

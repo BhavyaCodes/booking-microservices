@@ -21,11 +21,21 @@
           "path": "apps/orders/src/events/tickets-reserved-handler.ts",
           "name": "tickets-reserved-handler.ts",
           "isDirectory": false
+        },
+        {
+          "path": "apps/orders/src/events/order-expired-publisher.ts",
+          "name": "order-expired-publisher.ts",
+          "isDirectory": false
+        },
+        {
+          "path": "apps/orders/src/outbox/index.ts",
+          "name": "index.ts",
+          "isDirectory": false
         }
       ],
       "order": 0,
       "createdBy": "bhavya",
-      "collapsed": true,
+      "collapsed": false,
       "pinned": false,
       "isGlobal": false
     }
