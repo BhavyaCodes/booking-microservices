@@ -13,6 +13,14 @@ export type TicketsReservedEvent = {
   };
 };
 
+export type OrderConfirmedEvent = {
+  subject: Subjects.OrderConfirmed;
+  data: {
+    orderId: UuidString;
+    ticketIds: string[];
+  };
+};
+
 export type OrderExpiredEvent = {
   subject: Subjects.OrderExpired;
   data: {
@@ -21,4 +29,7 @@ export type OrderExpiredEvent = {
   };
 };
 
-export type NATSEvent = TicketsReservedEvent | OrderExpiredEvent;
+export type NATSEvent =
+  | TicketsReservedEvent
+  | OrderConfirmedEvent
+  | OrderExpiredEvent;

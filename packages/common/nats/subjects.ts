@@ -7,6 +7,7 @@ export enum Subjects {
   TicketsReserved = "tickets.reserved",
 
   OrderExpired = "orders.expired",
+  OrderConfirmed = "orders.confirmed",
 }
 
 // Type-level constraint: ensures all enum values conform to Subject type
