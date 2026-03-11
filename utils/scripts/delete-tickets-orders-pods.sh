@@ -1,11 +1,13 @@
 #!/bin/bash
 
-# Script to delete pods for tickets-depl and auth-depl deployments
+# Script to delete pods for tickets and orders deployments
 
-echo "Deleting pods for tickets-depl..."
-kubectl delete pods -l app=tickets-depl
+set -euo pipefail
 
-echo "Deleting pods for auth-depl..."
-kubectl delete pods -l app=auth-depl
+echo "Deleting pods for tickets..."
+kubectl delete pods -l app=tickets
+
+echo "Deleting pods for orders..."
+kubectl delete pods -l app=orders
 
 echo "Pods deletion completed."
