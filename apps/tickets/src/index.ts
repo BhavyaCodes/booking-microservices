@@ -6,6 +6,7 @@ import { outboxPublisher } from "./outbox";
 import { pl } from "./logger";
 import { handleOrderExpired } from "./events/order-expired-handler";
 import { MessageDispatcher, Subjects } from "@booking/common";
+import { handleOrderConfirmed } from "./events/order-confirmed-handler";
 
 const main = async () => {
   if (!process.env.JWT_KEY) {
@@ -38,6 +39,7 @@ const main = async () => {
     "tickets-service-durable",
   );
   dispatcher.on(Subjects.OrderExpired, handleOrderExpired);
+  dispatcher.on(Subjects.OrderConfirmed, handleOrderConfirmed);
   dispatcher.listen();
 
   await db.execute(sql`SELECT 1`).catch((err) => {
