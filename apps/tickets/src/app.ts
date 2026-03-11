@@ -782,6 +782,7 @@ const app = new Hono<{
           seatNumber: t.tickets.seatNumber,
           userId: Boolean(t.tickets.userId),
           eventId: t.tickets.eventId,
+          sold: t.tickets.sold,
         };
       });
 
