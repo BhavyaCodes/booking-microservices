@@ -90,32 +90,6 @@ export const expirationWorker = new Worker<JobData>(
           return;
         }
 
-        if (order.status === OrderStatus.SUCCEEDED) {
-          pl.debug(
-            "send order succeeded event to outbox for orderId:" + order.id,
-          );
-          await tx
-            .update(ordersTable)
-            .set({ ordersQueueProcessed: true })
-            .where(eq(ordersTable.id, orderId));
-
-          await addEventToOutBox(tx, {
-            subject: Subjects.OrderConfirmed,
-            data: {
-              orderId,
-              ticketIds: job.data.ticketIds,
-            },
-          });
-
-          pl.debug(
-            "Order already succeeded, marked as processed and sent OrderConfirmed event to outbox for orderId: " +
-              order.id,
-          );
-          return;
-        }
-
-        // Orders that are already expired, succeeded, or canceled should not be processed for expiration again
-
         if (!order.paymentIntent) {
           await tx
             .update(ordersTable)
@@ -133,6 +107,55 @@ export const expirationWorker = new Worker<JobData>(
             },
           });
         } else {
+          if (order.status === OrderStatus.SUCCEEDED) {
+            pl.debug(
+              "send order succeeded event to outbox for orderId:" + order.id,
+            );
+            await tx
+              .update(ordersTable)
+              .set({ ordersQueueProcessed: true })
+              .where(eq(ordersTable.id, orderId));
+
+            await addEventToOutBox(tx, {
+              subject: Subjects.OrderConfirmed,
+              data: {
+                orderId,
+                ticketIds: job.data.ticketIds,
+              },
+            });
+
+            pl.debug(
+              "Order already succeeded, marked as processed and sent OrderConfirmed event to outbox for orderId: " +
+                order.id,
+            );
+            return;
+          }
+
+          if (order.status === OrderStatus.CANCELED) {
+            pl.info(
+              { orderId: orderId },
+              "Payment intent already canceled, marking order as expired",
+            );
+            await tx
+              .update(ordersTable)
+              .set({ ordersQueueProcessed: true })
+              .where(eq(ordersTable.id, orderId));
+
+            pl.debug(
+              "Order already canceled, marked as processed for orderId: " +
+                order.id,
+            );
+
+            await addEventToOutBox(tx, {
+              subject: Subjects.OrderExpired,
+              data: {
+                orderId,
+                ticketIds: job.data.ticketIds,
+              },
+            });
+            return;
+          }
+
           // cancel payment intent with Stripe
           const paymentIntentId = order.paymentIntent.id;
 
