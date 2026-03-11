@@ -21,7 +21,14 @@ spec:
             - sh
             - -c
             - until nc -z orders-postgres-srv 5432; do echo waiting for postgres; sleep 2; done
-        - name: wait-for-migration-job
+        - name: wait-for-nats-orders
+          image: busybox:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - until nc -z nats-jetstream-srv 4222; do echo waiting for nats; sleep 2; done
+        - name: wait-for-migration-job-orders
           image: bitnami/kubectl:latest
           imagePullPolicy: IfNotPresent
           command:

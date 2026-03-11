@@ -46,6 +46,8 @@
 #### Client
  - [ ] don't use stripe client secret in url
  
+### Infra
+ - [x] check nats connection before starting? OR add retry mechanism in services
 ## Later
 
 - [x] error helper to make HTTP error payload same across the app
