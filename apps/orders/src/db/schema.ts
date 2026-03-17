@@ -60,9 +60,7 @@ export const ordersTable = pgTable(
     expiresAt: timestamp().notNull(),
     ticketIds: uuid().array().notNull(),
     createdAt: timestamp().defaultNow().notNull(),
-    paymentIntent: jsonb()
-      .default(null)
-      .$type<Stripe.Response<Stripe.PaymentIntent>>(),
+    paymentIntent: jsonb().default(null).$type<Stripe.PaymentIntent>(),
     ordersQueueProcessed: boolean().notNull().default(false),
   },
   (table) => [
