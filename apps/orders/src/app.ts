@@ -12,15 +12,17 @@ import { zValidator } from "@hono/zod-validator";
 import z from "zod";
 import {
   CustomErrorResponse,
+  ErrorCodes,
   HTTPException,
   zodValidationHook,
 } from "@booking/common";
 import { pl } from "./logger";
 import Stripe from "stripe";
-import { and, eq, inArray, notInArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { countryCodes } from "./utils/country-iso-3166-1-alpha-2";
 import { stripe, upsertStripeCustomer } from "./utils/stripe";
 import { bullQueue } from "./queues/order-process-queue";
+import { ErrorCode } from "bullmq";
 
 const app = new Hono<{
   Variables: {
@@ -161,106 +163,323 @@ const app = new Hono<{
       order: pendingOrder || null,
     });
   })
-  .get("/api/orders/:orderId/status", requireAuth, async (c) => {
-    const { orderId } = c.req.param();
-    const userId = c.get("currentUser")!.id;
+  .get(
+    "/api/orders/:orderId/status",
+    requireAuth,
+    zValidator(
+      "param",
+      z.object({ orderId: z.uuid({ version: "v7" }) }),
+      zodValidationHook,
+    ),
+    async (c) => {
+      const { orderId } = c.req.param();
+      const userId = c.get("currentUser")!.id;
 
-    const order = await db.query.ordersTable.findFirst({
-      where(fields, { eq, and }) {
-        return and(eq(fields.id, orderId), eq(fields.userId, userId));
-      },
-    });
+      const checkOrderStatus: Record<OrderStatus, boolean> =
+        // &  Record<Stripe.PaymentIntent.Status, boolean>
+        {
+          [OrderStatus.PAYMENT_INTENT_CREATED]: true,
+          [OrderStatus.REQUIRES_ACTION]: true,
+          [OrderStatus.PROCESSING]: true,
+          [OrderStatus.REQUIRES_CAPTURE]: true,
+          [OrderStatus.REQUIRES_CONFIRMATION]: true,
+          [OrderStatus.REQUIRES_PAYMENT_METHOD]: true,
 
-    if (!order) {
-      throw new HTTPException(404, {
-        res: new CustomErrorResponse({
-          message: "Order not found",
-        }),
-      });
-    }
+          // For created orders, we can consider them as pending and require user action to complete the order
+          [OrderStatus.CREATED]: false,
 
-    const orderStatus = order.status;
+          // For canceled, completed, and expired orders,
+          // we can consider them as final states where no further action is required
+          [OrderStatus.SUCCEEDED]: false,
+          [OrderStatus.CANCELED]: false,
+          [OrderStatus.EXPIRED]: false,
+        };
 
-    const checkOrderStatus: Record<OrderStatus, boolean> =
-      // &  Record<Stripe.PaymentIntent.Status, boolean>
-      {
-        [OrderStatus.PAYMENT_INTENT_CREATED]: true,
-        [OrderStatus.REQUIRES_ACTION]: true,
-        [OrderStatus.PROCESSING]: true,
-        [OrderStatus.REQUIRES_CAPTURE]: true,
-        [OrderStatus.REQUIRES_CONFIRMATION]: true,
-        [OrderStatus.REQUIRES_PAYMENT_METHOD]: true,
+      try {
+        const updatedOrder = await db.transaction(async (tx) => {
+          const ordersArr = await tx
+            .select()
+            .from(ordersTable)
+            .where(
+              and(eq(ordersTable.id, orderId), eq(ordersTable.userId, userId)),
+            )
+            .for("update");
 
-        // For created orders, we can consider them as pending and require user action to complete the order
-        [OrderStatus.CREATED]: false,
+          if (!ordersArr[0]) {
+            throw new HTTPException(404, {
+              res: new CustomErrorResponse({
+                message: "Order not found",
+              }),
+            });
+          }
+          const [order] = ordersArr;
 
-        // For canceled, completed, and expired orders,
-        // we can consider them as final states where no further action is required
-        [OrderStatus.SUCCEEDED]: false,
-        [OrderStatus.CANCELED]: false,
-        [OrderStatus.EXPIRED]: false,
-      };
+          const orderStatus = order.status;
 
-    if (!checkOrderStatus[orderStatus]) {
-      return c.json({ order });
-    }
+          if (!checkOrderStatus[orderStatus]) {
+            return order;
+          }
 
-    // fetch latest payment intent status from Stripe
-    if (!order.paymentIntent) {
-      pl.error(
-        { orderId },
-        "Order is in a pending state but missing payment intent",
-      );
-      throw new HTTPException(500, {
-        res: new CustomErrorResponse({
-          message: "Order is in a pending state but missing payment intent",
-        }),
-      });
-    }
-    const paymentIntent = await stripe.paymentIntents.retrieve(
-      order.paymentIntent.id,
-    );
+          // failsafe, this shouldn't happen
+          if (!order.paymentIntent) {
+            pl.error(
+              { orderId },
+              "Order is in a pending state but missing payment intent",
+            );
+            throw new HTTPException(500, {
+              res: new CustomErrorResponse({
+                message:
+                  "Order is in a pending state but missing payment intent",
+              }),
+            });
+          }
 
-    pl.debug(
-      { checkOrderStatus, paymentIntentStatus: paymentIntent.status },
-      "Stripe payment intent status",
-    );
+          const updatedPaymentIntent = await stripe.paymentIntents.retrieve(
+            order.paymentIntent.id,
+          );
 
-    if (!(paymentIntent.status in checkOrderStatus)) {
-      pl.error(
-        { paymentIntent, paymentIntentStatus: paymentIntent.status },
-        `Unknown Stripe payment intent status ${paymentIntent.status} received`,
-      );
-      throw new HTTPException(500, {
-        res: new CustomErrorResponse({
-          message: `Unknown payment intent status ${paymentIntent.status}`,
-        }),
-      });
-    }
+          pl.debug(
+            {
+              userId,
+              orderId,
+              orderStatus,
+              updatedPaymentIntent: updatedPaymentIntent.status,
+              // updatedPaymentIntentFull: updatedPaymentIntent,
+            },
+            "Stripe payment intent status during order status check",
+          );
 
-    // update status in database if it has changed
+          // this is a failsafe, ideally we should never receive an unknown status from Stripe.
+          // If we do, it's better to throw an error and investigate rather than silently failing
+          // or returning incorrect status to client
+          if (!(updatedPaymentIntent.status in checkOrderStatus)) {
+            pl.error(
+              {
+                updatedPaymentIntent,
+                updatedPaymentIntentStatus: updatedPaymentIntent.status,
+              },
+              `Unknown Stripe payment intent status ${updatedPaymentIntent.status} received`,
+            );
+            throw new HTTPException(500, {
+              res: new CustomErrorResponse({
+                message: `Unknown payment intent status ${updatedPaymentIntent.status}`,
+              }),
+            });
+          }
 
-    const updatedOrder = await db
-      .update(ordersTable)
-      .set({
-        // status:
-        status: paymentIntent.status as OrderStatus,
-        paymentIntent,
-      })
-      .where(
-        and(
-          eq(ordersTable.id, orderId),
-          notInArray(ordersTable.status, [
-            OrderStatus.EXPIRED,
-            OrderStatus.CANCELED,
-            OrderStatus.SUCCEEDED,
-          ]),
-        ),
-      )
-      .returning();
+          // update order status in database if it has changed
+          // if (updatedPaymentIntent.status !== order.paymentIntent.status) {
+          const updatedOrders = await tx
+            .update(ordersTable)
+            .set({
+              status: updatedPaymentIntent.status as OrderStatus,
+              paymentIntent: updatedPaymentIntent,
+            })
+            .where(eq(ordersTable.id, orderId))
+            .returning();
 
-    return c.json({ order: updatedOrder });
-  })
+          if (
+            updatedPaymentIntent.status === OrderStatus.SUCCEEDED ||
+            updatedPaymentIntent.status === OrderStatus.CANCELED
+          ) {
+            // we should promote the job in bull queue to expedite the
+            // processing of the order, since we already know the final status
+            // of the order from Stripe, we can skip waiting for the job
+            // to be processed at its scheduled time and expedite it immediately
+            const job = await bullQueue.getJob(orderId);
+
+            if (!job) {
+              return updatedOrders[0];
+            }
+
+            try {
+              await job.promote();
+            } catch (error) {
+              const code =
+                error instanceof Error && "code" in error
+                  ? Number((error as any).code)
+                  : null;
+
+              if (code === ErrorCode.JobNotInState) {
+                pl.info(
+                  { orderId, job },
+                  "Job not in a promotable state, skipping promotion",
+                );
+              } else {
+                throw error;
+              }
+            }
+          }
+
+          return updatedOrders[0];
+
+          // } else {
+          //   return order;
+          // }
+        });
+        return c.json({ order: updatedOrder });
+      } catch (error) {
+        if (error instanceof HTTPException) {
+          throw error;
+        }
+        pl.error(error, "Error checking order status");
+        throw new HTTPException(500, {
+          res: new CustomErrorResponse({
+            message: "Failed to check order status",
+          }),
+        });
+      }
+    },
+  )
+  .post(
+    "/api/orders/:orderId/cancel",
+    requireAuth,
+    zValidator(
+      "param",
+      z.object({ orderId: z.uuid({ version: "v7" }) }),
+      zodValidationHook,
+    ),
+    async (c) => {
+      const { orderId } = c.req.param();
+
+      const userId = c.get("currentUser")!.id;
+
+      try {
+        const result = await db.transaction(async (tx) => {
+          const ordersArr = await tx
+            .select()
+            .from(ordersTable)
+            .where(
+              and(eq(ordersTable.id, orderId), eq(ordersTable.userId, userId)),
+            )
+            .for("update");
+
+          if (!ordersArr[0]) {
+            throw new HTTPException(404, {
+              res: new CustomErrorResponse({
+                message: "Order not found",
+              }),
+            });
+          }
+
+          const [order] = ordersArr;
+
+          if (order.status === OrderStatus.CANCELED) {
+            throw new HTTPException(400, {
+              res: new CustomErrorResponse({
+                code: ErrorCodes.PAYMENT_CANCEL_ALREADY_CANCELED,
+                message: "Order is already canceled",
+              }),
+            });
+          }
+
+          if (order.status === OrderStatus.SUCCEEDED) {
+            throw new HTTPException(400, {
+              res: new CustomErrorResponse({
+                code: ErrorCodes.PAYMENT_CANCEL_ALREADY_SUCCEEDED,
+                message: "Order is already succeeded, cannot cancel",
+              }),
+            });
+          }
+
+          if (order.status === OrderStatus.EXPIRED) {
+            throw new HTTPException(400, {
+              res: new CustomErrorResponse({
+                code: ErrorCodes.PAYMENT_CANCEL_ALREADY_EXPIRED,
+                message: `Order is already expired, cannot cancel`,
+              }),
+            });
+          }
+
+          const job = await bullQueue.getJob(orderId);
+
+          if (!order.paymentIntent) {
+            const [updatedOrder] = await tx
+              .update(ordersTable)
+              .set({ status: OrderStatus.CANCELED })
+              .where(eq(ordersTable.id, orderId))
+              .returning();
+
+            if (job) {
+              try {
+                await job.promote();
+              } catch (error) {
+                const code =
+                  error instanceof Error && "code" in error
+                    ? Number((error as any).code)
+                    : null;
+
+                if (code === ErrorCode.JobNotInState) {
+                  pl.info(
+                    { orderId, job },
+                    "Job not in a promotable state, skipping promotion",
+                  );
+                } else {
+                  throw error;
+                }
+              }
+            }
+
+            return updatedOrder;
+          } else {
+            // cancel payment intent in Stripe
+
+            try {
+              await stripe.paymentIntents.cancel(order.paymentIntent.id);
+            } catch (error) {
+              pl.error(error, "Error canceling payment intent in Stripe");
+              throw new HTTPException(500, {
+                res: new CustomErrorResponse({
+                  code: ErrorCodes.PAYMENT_CANCELLATION_FAILED,
+                  message: "Failed to cancel payment intent",
+                }),
+              });
+            }
+
+            const [updatedOrder] = await tx
+              .update(ordersTable)
+              .set({ status: OrderStatus.CANCELED })
+              .where(eq(ordersTable.id, orderId))
+              .returning();
+
+            if (job) {
+              try {
+                await job.promote();
+              } catch (error) {
+                const code =
+                  error instanceof Error && "code" in error
+                    ? Number((error as any).code)
+                    : null;
+
+                if (code === ErrorCode.JobNotInState) {
+                  pl.info(
+                    { orderId, job },
+                    "Job not in a promotable state, skipping promotion",
+                  );
+                } else {
+                  throw error;
+                }
+              }
+            }
+
+            return updatedOrder;
+          }
+        });
+
+        return c.json({ order: result });
+      } catch (error) {
+        if (error instanceof HTTPException) {
+          throw error;
+        }
+        pl.error(error, "Error canceling order");
+        throw new HTTPException(500, {
+          res: new CustomErrorResponse({
+            message: "Failed to cancel order",
+          }),
+        });
+      }
+    },
+  )
   .post("/api/orders/stripe-webhook", async (c) => {
     const endpointSecret = process.env.ORDERS_STRIPE_WEBHOOK_SECRET!;
     pl.debug("Received Stripe webhook");
@@ -352,7 +571,10 @@ const app = new Hono<{
 
             await tx
               .update(ordersTable)
-              .set({ status: OrderStatus.SUCCEEDED })
+              .set({
+                status: OrderStatus.SUCCEEDED,
+                paymentIntent: event.data.object,
+              })
               .where(eq(ordersTable.id, orderId));
 
             const job = await bullQueue.getJob(orderId);
@@ -367,22 +589,22 @@ const app = new Hono<{
               return;
             }
 
-            const jobState = await job.getState();
-
-            if (jobState === "completed") {
-              return;
-            }
-
-            if (jobState === "failed") {
-              pl.error(
-                { orderId },
-                "Expiration job is in failed state for successful payment, this should not happen",
-              );
-              return;
-            }
-
-            if (jobState === "delayed") {
+            try {
               await job.promote();
+            } catch (error) {
+              const code =
+                error instanceof Error && "code" in error
+                  ? Number((error as any).code)
+                  : null;
+
+              if (code === ErrorCode.JobNotInState) {
+                pl.info(
+                  { orderId, job },
+                  "Job not in a promotable state, skipping promotion",
+                );
+              } else {
+                throw error;
+              }
             }
           });
 
@@ -396,6 +618,11 @@ const app = new Hono<{
           });
         }
 
+      // NOTE: payment_failed means the payment attempt failed,
+      // but the payment intent may still be active and can be retried by the user.
+      // So we should not mark the order as canceled immediately,
+      // instead we should wait for either a successful payment OR
+      // an explicit cancellation from the user.
       case "payment_intent.payment_failed":
         pl.debug(
           event.data.object,
@@ -418,40 +645,29 @@ const app = new Hono<{
               return;
             }
 
+            const [order] = orderArr;
+
+            const terminalStatuses: OrderStatus[] = [
+              OrderStatus.EXPIRED,
+              OrderStatus.CANCELED,
+              OrderStatus.SUCCEEDED,
+            ];
+
+            if (terminalStatuses.includes(order.status)) {
+              pl.info(
+                { orderId, status: order.status },
+                "Order already in future/terminal state, skipping payment_failed webhook",
+              );
+              return;
+            }
+
             await tx
               .update(ordersTable)
-              .set({ status: OrderStatus.CANCELED })
+              .set({
+                status: event.data.object.status as OrderStatus,
+                paymentIntent: event.data.object,
+              })
               .where(eq(ordersTable.id, orderId));
-
-            const job = await bullQueue.getJob(orderId);
-
-            pl.debug({ job }, "Fetched expiration job for failed payment");
-
-            if (!job) {
-              pl.error(
-                { orderId },
-                "No pending job found for failed payment, skipping",
-              );
-              return;
-            }
-
-            const jobState = await job.getState();
-
-            if (jobState === "completed") {
-              return;
-            }
-
-            if (jobState === "failed") {
-              pl.error(
-                { orderId },
-                "Expiration job is in failed state for failed payment, this should not happen",
-              );
-              return;
-            }
-
-            if (jobState === "delayed") {
-              await job.promote();
-            }
           });
 
           return c.json({ received: true });
@@ -495,7 +711,10 @@ const app = new Hono<{
 
             await tx
               .update(ordersTable)
-              .set({ status: OrderStatus.CANCELED })
+              .set({
+                status: OrderStatus.CANCELED,
+                paymentIntent: event.data.object,
+              })
               .where(eq(ordersTable.id, orderId));
 
             const job = await bullQueue.getJob(orderId);
@@ -562,7 +781,10 @@ const app = new Hono<{
 
             await tx
               .update(ordersTable)
-              .set({ status: OrderStatus.PROCESSING })
+              .set({
+                status: OrderStatus.PROCESSING,
+                paymentIntent: event.data.object,
+              })
               .where(eq(ordersTable.id, orderId));
           });
 
@@ -598,14 +820,13 @@ const app = new Hono<{
 
             const [order] = orderArr;
 
-            const futureStatuses: OrderStatus[] = [
+            const terminalStatuses: OrderStatus[] = [
               OrderStatus.EXPIRED,
               OrderStatus.CANCELED,
               OrderStatus.SUCCEEDED,
-              OrderStatus.PROCESSING,
             ];
 
-            if (futureStatuses.includes(order.status)) {
+            if (terminalStatuses.includes(order.status)) {
               pl.info(
                 { orderId, status: order.status },
                 "Order already in future/terminal state, skipping requires_action webhook",
@@ -615,7 +836,10 @@ const app = new Hono<{
 
             await tx
               .update(ordersTable)
-              .set({ status: OrderStatus.REQUIRES_ACTION })
+              .set({
+                status: OrderStatus.REQUIRES_ACTION,
+                paymentIntent: event.data.object,
+              })
               .where(eq(ordersTable.id, orderId));
           });
 
