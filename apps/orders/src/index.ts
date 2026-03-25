@@ -98,6 +98,10 @@ const main = async () => {
     pool.end().catch((err) => {
       pl.error(err, "Failed to end Postgres connection pool");
     });
+
+    expirationWorker.close().catch((err) => {
+      pl.error(err, "Failed to close expiration worker");
+    });
   };
 
   const server = Bun.serve({
