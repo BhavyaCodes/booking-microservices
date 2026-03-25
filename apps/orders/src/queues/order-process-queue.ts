@@ -17,9 +17,14 @@ type JobData = {
   ticketIds: string[];
 };
 
+const redisHost = process.env.REDIS_HOST;
+if (!redisHost) {
+  throw new Error("REDIS_HOST must be present");
+}
+
 export const bullQueue = new Queue<JobData>(PROCESS_ORDER_QUEUE, {
   connection: {
-    host: process.env.REDIS_HOST,
+    host: redisHost,
   },
   defaultJobOptions: {
     attempts: 3,
@@ -317,7 +322,7 @@ export const expirationWorker = new Worker<JobData>(
   },
   {
     connection: {
-      host: process.env.REDIS_HOST,
+      host: redisHost,
     },
   },
 );
