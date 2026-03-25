@@ -64,7 +64,7 @@ export async function handleTicketsReserved(msg: JsMsg) {
           ticketIds: data.ticketIds,
         },
         {
-          delay: new Date(data.expiresAt).getTime() - Date.now(),
+          delay: Math.max(new Date(data.expiresAt).getTime() - Date.now(), 0),
           jobId: insertedOrderArray[0].id, // Use order ID as job ID for easy correlation
         },
       );
