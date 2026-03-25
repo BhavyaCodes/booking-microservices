@@ -1,6 +1,6 @@
 import type { TicketsReservedEvent } from "@booking/common";
 import type { JsMsg } from "@nats-io/jetstream/lib/jsmsg";
-import { arrayOverlaps, and, notInArray, ne, or, eq } from "drizzle-orm";
+import { arrayOverlaps, and, or, eq } from "drizzle-orm";
 import { pl } from "../logger";
 import { db } from "../db";
 import { ordersTable, OrderStatus } from "../db/schema";
