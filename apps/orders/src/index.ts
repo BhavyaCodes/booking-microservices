@@ -100,7 +100,7 @@ const main = async () => {
     });
   };
 
-  Bun.serve({
+  const server = Bun.serve({
     port: 3000,
     fetch: app.fetch,
   });
@@ -110,7 +110,7 @@ const main = async () => {
     pl.info("SIGINT received");
     await cleanup().then(() => {
       pl.info("Cleanup completed, exiting");
-      process.exit(0);
+      server.stop();
     });
   });
 
@@ -118,7 +118,7 @@ const main = async () => {
     pl.info("SIGTERM received");
     await cleanup().then(() => {
       pl.info("Cleanup completed, exiting");
-      process.exit(0);
+      server.stop();
     });
   });
 };
