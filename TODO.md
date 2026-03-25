@@ -37,7 +37,12 @@
  - [ ] emit events after webhook/status update of order
  - [x] replace bulljs with bullmq
 ##### Later
- - [ ] use a different queue for when payment is processing
+ - [ ] use a different queue for when payment is processing?
+ - [ ] ensure transaction works with bullmq, 2 ways
+   - [ ] Enqueue after the transaction commits
+     - Retry add with backoff in a try/catch.
+     - Periodic reconciliation: find orders that are not ordersQueueProcessed, past expiresAt, and have no job / wrong state (harder without storing job id).
+   - [ ] use outbox pattern similar to NATS pattern
 
 #### Expiration of orders
  - [ ] integrate bulljs
