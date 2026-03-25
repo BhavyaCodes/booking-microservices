@@ -9,6 +9,7 @@ import { ordersTable, OrderStatus } from "../db/schema";
 import { eq } from "drizzle-orm/sql/expressions/conditions";
 import { stripe } from "../utils/stripe";
 import { addEventToOutBox } from "../outbox";
+import Stripe from "stripe";
 
 export const PROCESS_ORDER_QUEUE = "order-process";
 
@@ -63,6 +64,9 @@ export const expirationWorker = new Worker<JobData>(
     }
 
     const orderId = job.id;
+    // If we decide to retry, we must throw *after* the DB transaction commits.
+    // Otherwise any DB updates done inside the transaction would be rolled back.
+    let delayedError: DelayedError | null = null;
 
     try {
       await db.transaction(async (tx) => {
@@ -79,6 +83,11 @@ export const expirationWorker = new Worker<JobData>(
           );
           return;
         }
+
+        pl.debug(
+          { orderId: orderId, orderArr },
+          "Fetched order for expiration processing",
+        );
 
         const [order] = orderArr;
 
@@ -159,42 +168,148 @@ export const expirationWorker = new Worker<JobData>(
           // cancel payment intent with Stripe
           const paymentIntentId = order.paymentIntent.id;
 
-          await stripe.paymentIntents.cancel(paymentIntentId).catch((err) => {
-            pl.error(
-              { err, paymentIntentId, orderId: orderId },
-              "Failed to cancel payment intent in Stripe",
-            );
+          try {
+            await stripe.paymentIntents.cancel(paymentIntentId);
 
-            const noOfAttempts = job.attemptsMade + 1; // attemptsMade is zero-indexed
+            await tx
+              .update(ordersTable)
+              .set({ status: OrderStatus.EXPIRED, ordersQueueProcessed: true })
+              .where(eq(ordersTable.id, orderId));
 
-            // set custom backoff delay for retry based on number of attempts
-            const delayInMs = 1000 * 10 ** noOfAttempts;
+            // add event to outbox for eventual consistency with tickets service
+            await addEventToOutBox(tx, {
+              subject: Subjects.OrderExpired,
+              data: {
+                orderId,
+                ticketIds: job.data.ticketIds,
+              },
+            });
+          } catch (error: any) {
+            if (error instanceof Stripe.errors.StripeInvalidRequestError) {
+              switch (error.code) {
+                case "payment_intent_unexpected_state":
+                  pl.warn(
+                    { error, paymentIntentId, orderId: orderId },
+                    "Payment intent in unexpected state in Stripe, likely already canceled or succeeded",
+                  );
 
-            job.moveToDelayed(Date.now() + delayInMs);
-            // TODO: handle this error better
+                  // fetch the payment intent to check its current status
+                  const paymentIntent =
+                    await stripe.paymentIntents.retrieve(paymentIntentId);
 
-            throw new DelayedError(
-              `Failed to cancel payment intent in Stripe, retrying in ${delayInMs / 1000} seconds`,
-            );
-          });
+                  pl.debug(
+                    {
+                      fetchedPaymentIntentStatus: paymentIntent.status,
+                    },
+                    "Fetched payment intent status from Stripe after unexpected state error",
+                  );
 
-          // update order status to expired
+                  if (
+                    paymentIntent.status === OrderStatus.SUCCEEDED ||
+                    paymentIntent.status === OrderStatus.CANCELED
+                  ) {
+                    pl.info(
+                      {
+                        paymentIntentId,
+                        paymentIntentStatus: paymentIntent.status,
+                        orderId: orderId,
+                      },
+                      "Payment intent already in terminal state in Stripe, marking order as processed",
+                    );
 
-          await tx
-            .update(ordersTable)
-            .set({ status: OrderStatus.EXPIRED, ordersQueueProcessed: true })
-            .where(eq(ordersTable.id, orderId));
+                    await tx
+                      .update(ordersTable)
+                      .set({
+                        ordersQueueProcessed: true,
+                        status:
+                          paymentIntent.status === OrderStatus.SUCCEEDED
+                            ? OrderStatus.SUCCEEDED
+                            : OrderStatus.EXPIRED,
+                        paymentIntent,
+                      })
+                      .where(eq(ordersTable.id, orderId));
 
-          // add event to outbox for eventual consistency with tickets service
-          await addEventToOutBox(tx, {
-            subject: Subjects.OrderExpired,
-            data: {
-              orderId,
-              ticketIds: job.data.ticketIds,
-            },
-          });
+                    if (paymentIntent.status === OrderStatus.SUCCEEDED) {
+                      await addEventToOutBox(tx, {
+                        subject: Subjects.OrderConfirmed,
+                        data: {
+                          orderId,
+                          ticketIds: job.data.ticketIds,
+                        },
+                      });
+                    } else if (paymentIntent.status === OrderStatus.CANCELED) {
+                      await addEventToOutBox(tx, {
+                        subject: Subjects.OrderExpired,
+                        data: {
+                          orderId,
+                          ticketIds: job.data.ticketIds,
+                        },
+                      });
+                    }
+                  } else if (
+                    Object.values(OrderStatus).includes(
+                      paymentIntent.status as OrderStatus,
+                    )
+                  ) {
+                    await tx
+                      .update(ordersTable)
+                      .set({ status: paymentIntent.status as OrderStatus })
+                      .where(eq(ordersTable.id, orderId));
+                    pl.error(
+                      {
+                        paymentIntentId,
+                        paymentIntentStatus: paymentIntent.status,
+                        orderId: orderId,
+                      },
+                      "Payment intent in non-terminal state in Stripe, updating order status accordingly",
+                    );
+
+                    delayedError = new DelayedError(
+                      "Payment intent in non-terminal state in Stripe, retrying",
+                    );
+                    return;
+                  } else {
+                    pl.error(
+                      {
+                        paymentIntentId,
+                        paymentIntentStatus: paymentIntent.status,
+                        orderId: orderId,
+                      },
+                      "Payment intent in unknown state in Stripe, cannot determine how to update order",
+                    );
+                    delayedError = new DelayedError(
+                      "Payment intent in unknown state in Stripe, retrying",
+                    );
+                    return;
+                  }
+                  break;
+
+                default:
+                  pl.error(
+                    { error, paymentIntentId, orderId: orderId },
+                    "StripeInvalidRequestError while canceling payment intent in Stripe",
+                  );
+                  // throw error;
+                  throw new DelayedError(
+                    "StripeInvalidRequestError while canceling payment intent in Stripe, retrying",
+                  );
+              }
+            } else {
+              pl.error(
+                { error, paymentIntentId, orderId: orderId },
+                "Failed to cancel payment intent in Stripe",
+              );
+              throw new DelayedError(
+                "Failed to cancel payment intent in Stripe, retrying",
+              );
+            }
+          }
         }
       });
+
+      if (delayedError) {
+        throw delayedError;
+      }
     } catch (error) {
       pl.error(error, "Error processing expiration job");
       throw error;
