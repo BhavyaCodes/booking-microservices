@@ -40,7 +40,10 @@ const main = async () => {
   );
   dispatcher.on(Subjects.OrderExpired, handleOrderExpired);
   dispatcher.on(Subjects.OrderConfirmed, handleOrderConfirmed);
-  dispatcher.listen();
+  await dispatcher.listen().catch((error) => {
+    pl.fatal(error, "Failed to start message dispatcher");
+    process.exit(-1);
+  });
 
   await db.execute(sql`SELECT 1`).catch((err) => {
     pl.fatal(err, "Failed to connect to Postgres");
