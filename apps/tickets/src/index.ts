@@ -79,7 +79,7 @@ const main = async () => {
     });
   };
 
-  Bun.serve({
+  const server = Bun.serve({
     port: 3000,
     fetch: app.fetch,
   });
@@ -87,12 +87,18 @@ const main = async () => {
   // Graceful shutdown
   process.on("SIGINT", async () => {
     pl.info("SIGINT received");
-    await cleanup();
+    await cleanup().then(() => {
+      pl.info("Cleanup completed, exiting");
+      server.stop();
+    });
   });
 
   process.on("SIGTERM", async () => {
     pl.info("SIGTERM received");
-    await cleanup();
+    await cleanup().then(() => {
+      pl.info("Cleanup completed, exiting");
+      server.stop();
+    });
   });
 };
 
