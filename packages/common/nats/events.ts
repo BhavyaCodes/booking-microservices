@@ -17,7 +17,7 @@ export type OrderConfirmedEvent = {
   subject: Subjects.OrderConfirmed;
   data: {
     orderId: UuidString;
-    ticketIds: string[];
+    ticketIds: UuidString[];
   };
 };
 
@@ -25,7 +25,7 @@ export type OrderExpiredEvent = {
   subject: Subjects.OrderExpired;
   data: {
     orderId: UuidString;
-    ticketIds: string[];
+    ticketIds: UuidString[];
   };
 };
 
