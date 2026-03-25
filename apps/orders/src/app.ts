@@ -89,7 +89,11 @@ const app = new Hono<{
             .select()
             .from(ordersTable)
             .where(
-              and(eq(ordersTable.id, orderId), eq(ordersTable.userId, userId)),
+              and(
+                eq(ordersTable.id, orderId),
+                eq(ordersTable.userId, userId),
+                eq(ordersTable.status, OrderStatus.CREATED),
+              ),
             )
             .for("update");
 
