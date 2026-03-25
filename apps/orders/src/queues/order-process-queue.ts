@@ -294,8 +294,8 @@ export const expirationWorker = new Worker<JobData>(
                     { error, paymentIntentId, orderId: orderId },
                     "StripeInvalidRequestError while canceling payment intent in Stripe",
                   );
-                  // throw error;
-                  throw new DelayedError(
+
+                  delayedError = new DelayedError(
                     "StripeInvalidRequestError while canceling payment intent in Stripe, retrying",
                   );
               }
@@ -304,7 +304,7 @@ export const expirationWorker = new Worker<JobData>(
                 { error, paymentIntentId, orderId: orderId },
                 "Failed to cancel payment intent in Stripe",
               );
-              throw new DelayedError(
+              delayedError = new DelayedError(
                 "Failed to cancel payment intent in Stripe, retrying",
               );
             }
