@@ -4,11 +4,18 @@ import { sql } from "drizzle-orm";
 import { natsWrapper } from "./nats-wrapper";
 // import { outboxPublisher } from "./outbox";
 import { pl } from "./logger";
-import { TicketsReservedListener } from "./events/tickets-reserved-listener";
+import { handleTicketsReserved } from "./events/tickets-reserved-handler";
+import { outboxPublisher } from "./outbox";
+import { MessageDispatcher, Subjects } from "@booking/common";
+import { expirationWorker } from "./queues/order-process-queue";
 
 const main = async () => {
   if (!process.env.JWT_KEY) {
     throw new Error("JWT_KEY must be present");
+  }
+
+  if (!process.env.REDIS_HOST) {
+    throw new Error("REDIS_HOST must be present");
   }
 
   if (
@@ -37,8 +44,16 @@ const main = async () => {
     process.exit(1);
   }
 
-  // new TicketCreatedListener(natsWrapper.js).listen();
-  new TicketsReservedListener(natsWrapper.js).listen();
+  const dispatcher = new MessageDispatcher(
+    natsWrapper.js,
+    "booking",
+    "orders-service-durable",
+  );
+  dispatcher.on(Subjects.TicketsReserved, handleTicketsReserved);
+  await dispatcher.listen().catch((error) => {
+    pl.fatal(error, "Failed to start message dispatcher");
+    process.exit(-1);
+  });
 
   await db.execute(sql`SELECT 1`).catch((error) => {
     pl.fatal(error, "Failed to connect to Postgres");
@@ -51,13 +66,26 @@ const main = async () => {
   await notifClient.query("LISTEN outbox_insert");
   pl.trace("🚀 ~ listening for outbox_insert notifications");
 
-  // notifClient.on("notification", (msg) => {
-  //   if (msg.channel === "outbox_insert") {
-  //     outboxPublisher().catch((err) => {
-  //       pl.error(err, "Failed to process outbox events");
-  //     });
-  //   }
-  // });
+  notifClient.on("notification", (msg) => {
+    pl.debug("Received pg notification");
+    if (msg.channel === "outbox_insert") {
+      pl.debug("Received outbox_insert notification, processing outbox events");
+      outboxPublisher()
+        .catch((err) => {
+          pl.error(err, "Failed to process outbox events");
+        })
+        .finally(() => {
+          pl.debug("Finished processing outbox events");
+        });
+    }
+  });
+
+  if (!expirationWorker.isRunning()) {
+    expirationWorker.run().catch((err) => {
+      pl.fatal(err, "Failed to start expiration worker");
+      process.exit(-1);
+    });
+  }
 
   const cleanup = async () => {
     notifClient.query("UNLISTEN outbox_insert").catch((err) => {
@@ -70,9 +98,13 @@ const main = async () => {
     pool.end().catch((err) => {
       pl.error(err, "Failed to end Postgres connection pool");
     });
+
+    expirationWorker.close().catch((err) => {
+      pl.error(err, "Failed to close expiration worker");
+    });
   };
 
-  Bun.serve({
+  const server = Bun.serve({
     port: 3000,
     fetch: app.fetch,
   });
@@ -82,7 +114,7 @@ const main = async () => {
     pl.info("SIGINT received");
     await cleanup().then(() => {
       pl.info("Cleanup completed, exiting");
-      process.exit(0);
+      server.stop();
     });
   });
 
@@ -90,7 +122,7 @@ const main = async () => {
     pl.info("SIGTERM received");
     await cleanup().then(() => {
       pl.info("Cleanup completed, exiting");
-      process.exit(0);
+      server.stop();
     });
   });
 };

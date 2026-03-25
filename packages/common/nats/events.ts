@@ -1,4 +1,4 @@
-import type { DateISOString } from "../interfaces";
+import type { DateISOString, UuidString } from "../interfaces";
 import { Subjects } from "./subjects";
 
 export type TicketsReservedEvent = {
@@ -13,4 +13,23 @@ export type TicketsReservedEvent = {
   };
 };
 
-export type NATSEvent = TicketsReservedEvent;
+export type OrderConfirmedEvent = {
+  subject: Subjects.OrderConfirmed;
+  data: {
+    orderId: UuidString;
+    ticketIds: UuidString[];
+  };
+};
+
+export type OrderExpiredEvent = {
+  subject: Subjects.OrderExpired;
+  data: {
+    orderId: UuidString;
+    ticketIds: UuidString[];
+  };
+};
+
+export type NATSEvent =
+  | TicketsReservedEvent
+  | OrderConfirmedEvent
+  | OrderExpiredEvent;

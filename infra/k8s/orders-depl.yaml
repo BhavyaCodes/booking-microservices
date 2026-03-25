@@ -21,7 +21,21 @@ spec:
             - sh
             - -c
             - until nc -z orders-postgres-srv 5432; do echo waiting for postgres; sleep 2; done
-        - name: wait-for-migration-job
+        - name: wait-for-nats-orders
+          image: busybox:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - until nc -z nats-jetstream-srv 4222; do echo waiting for nats; sleep 2; done
+        - name: wait-for-nats-stream-orders
+          image: bitnami/kubectl:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - kubectl wait --for=condition=complete job/nats-stream-setup --timeout=300s
+        - name: wait-for-migration-job-orders
           image: bitnami/kubectl:latest
           imagePullPolicy: IfNotPresent
           command:
@@ -67,6 +81,9 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            - name: REDIS_HOST
+              value: "orders-redis-srv"
+             
 
 ---
 apiVersion: v1

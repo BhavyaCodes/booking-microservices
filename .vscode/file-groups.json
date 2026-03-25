@@ -1,0 +1,43 @@
+{
+  "version": 2,
+  "groups": [
+    {
+      "id": "mm7jyvudgwldhy152x4",
+      "name": "Expiry queue",
+      "icon": "folder",
+      "color": "",
+      "files": [
+        {
+          "path": "apps/orders/src/queues/order-process-queue.ts",
+          "name": "order-process-queue.ts",
+          "isDirectory": false
+        },
+        {
+          "path": "apps/orders/src/app.ts",
+          "name": "app.ts",
+          "isDirectory": false
+        },
+        {
+          "path": "apps/orders/src/events/tickets-reserved-handler.ts",
+          "name": "tickets-reserved-handler.ts",
+          "isDirectory": false
+        },
+        {
+          "path": "apps/orders/src/events/order-expired-publisher.ts",
+          "name": "order-expired-publisher.ts",
+          "isDirectory": false
+        },
+        {
+          "path": "apps/orders/src/outbox/index.ts",
+          "name": "index.ts",
+          "isDirectory": false
+        }
+      ],
+      "order": 0,
+      "createdBy": "bhavya",
+      "collapsed": false,
+      "pinned": false,
+      "isGlobal": false
+    }
+  ]
+}

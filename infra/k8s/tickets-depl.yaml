@@ -21,7 +21,14 @@ spec:
             - sh
             - -c
             - until nc -z tickets-postgres-srv 5432; do echo waiting for postgres; sleep 2; done
-        - name: wait-for-migration-job
+        - name: wait-for-nats-stream-tickets
+          image: bitnami/kubectl:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - kubectl wait --for=condition=complete job/nats-stream-setup --timeout=300s
+        - name: wait-for-migration-job-tickets
           image: bitnami/kubectl:latest
           imagePullPolicy: IfNotPresent
           command:

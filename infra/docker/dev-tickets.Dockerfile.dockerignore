@@ -8,6 +8,7 @@ secrets.md
 dev.env
 temp-notes
 utils
+.vscode
 
 apps/client
 apps/auth

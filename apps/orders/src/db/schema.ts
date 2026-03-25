@@ -8,9 +8,11 @@ import {
   uniqueIndex,
   jsonb,
   varchar,
+  boolean,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { Stripe } from "stripe";
+import { NATSEvent, Subjects } from "@booking/common";
 
 export enum OrderStatus {
   /**
@@ -58,9 +60,8 @@ export const ordersTable = pgTable(
     expiresAt: timestamp().notNull(),
     ticketIds: uuid().array().notNull(),
     createdAt: timestamp().defaultNow().notNull(),
-    paymentIntent: jsonb()
-      .default(null)
-      .$type<Stripe.Response<Stripe.PaymentIntent>>(),
+    paymentIntent: jsonb().default(null).$type<Stripe.PaymentIntent>(),
+    ordersQueueProcessed: boolean().notNull().default(false),
   },
   (table) => [
     index("ticket_ids_idx").using("gin", table.ticketIds),
@@ -75,3 +76,17 @@ export const ordersTable = pgTable(
 );
 
 // 1 user can only have 1 active order at a time
+
+export const subjectEnum = pgEnum(
+  "nats_subjects",
+  Object.values(Subjects) as [string, ...string[]],
+);
+
+export const outboxTable = pgTable("outbox", {
+  id: uuid()
+    .primaryKey()
+    .default(sql`uuidv7()`),
+  subject: subjectEnum().notNull().$type<NATSEvent["subject"]>(),
+  data: jsonb().notNull().$type<NATSEvent["data"]>(),
+  processed: boolean().notNull().default(false),
+});

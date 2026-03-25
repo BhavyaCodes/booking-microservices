@@ -53,6 +53,7 @@ export const ticketsTable = pgTable(
     row: integer().notNull(),
     seatNumber: integer().notNull(),
     userId: varchar({ length: 255 }),
+    sold: boolean().notNull().default(false),
     version: integer().notNull().default(0),
     // .$onUpdateFn((): SQL => sql`${ticketsTable.version} + 1`),
   },

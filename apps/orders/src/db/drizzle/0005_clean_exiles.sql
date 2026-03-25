@@ -1,0 +1,1 @@
+ALTER TYPE "public"."nats_subjects" ADD VALUE 'orders.confirmed';

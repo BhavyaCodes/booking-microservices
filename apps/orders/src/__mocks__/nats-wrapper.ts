@@ -13,6 +13,9 @@ const mockDrain = vi.fn().mockResolvedValue(undefined);
 
 let lastCallback: ((msg: any) => void) | undefined;
 
+// Store registered handlers so tests can trigger specific subjects
+const registeredHandlers = new Map<string, (msg: any) => void>();
+
 // Minimal shapes are asserted through unknown to keep TS strict happy while staying lightweight for tests
 const mockJs = {
   consumers: {
@@ -40,10 +43,23 @@ export const natsWrapper = {
     mockDrain.mockReset();
     natsWrapper.connect.mockReset();
     lastCallback = undefined;
+    registeredHandlers.clear();
   },
+  /** Trigger the raw consume callback (legacy — works with dispatcher routing) */
   __triggerMessage: async (msg: any) => {
     if (lastCallback) {
       await lastCallback(msg);
+    }
+  },
+  /** Register a handler for a subject (called by MessageDispatcher.on via mock consume) */
+  __registerHandler: (subject: string, handler: (msg: any) => void) => {
+    registeredHandlers.set(subject, handler);
+  },
+  /** Trigger a handler for a specific subject */
+  __triggerHandler: async (subject: string, msg: any) => {
+    const handler = registeredHandlers.get(subject);
+    if (handler) {
+      await handler(msg);
     }
   },
 };

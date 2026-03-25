@@ -8,6 +8,41 @@
       "when": 1771238794749,
       "tag": "0000_tan_bishop",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1771783465812,
+      "tag": "0001_little_mole_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1771784071204,
+      "tag": "0002_outbox-notify",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1772532577104,
+      "tag": "0003_married_peter_parker",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1772533029900,
+      "tag": "0004_nice_morlocks",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1773140272850,
+      "tag": "0005_clean_exiles",
+      "breakpoints": true
     }
   ]
 }

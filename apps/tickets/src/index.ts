@@ -2,9 +2,11 @@ import { db, pool } from "./db";
 import { app } from "./app";
 import { sql } from "drizzle-orm";
 import { natsWrapper } from "./nats-wrapper";
-// import { TicketCreatedListener } from "./events/ticket-created-listener";
 import { outboxPublisher } from "./outbox";
 import { pl } from "./logger";
+import { handleOrderExpired } from "./events/order-expired-handler";
+import { MessageDispatcher, Subjects } from "@booking/common";
+import { handleOrderConfirmed } from "./events/order-confirmed-handler";
 
 const main = async () => {
   if (!process.env.JWT_KEY) {
@@ -31,7 +33,17 @@ const main = async () => {
     process.exit(1);
   }
 
-  // new TicketCreatedListener(natsWrapper.js).listen();
+  const dispatcher = new MessageDispatcher(
+    natsWrapper.js,
+    "booking",
+    "tickets-service-durable",
+  );
+  dispatcher.on(Subjects.OrderExpired, handleOrderExpired);
+  dispatcher.on(Subjects.OrderConfirmed, handleOrderConfirmed);
+  await dispatcher.listen().catch((error) => {
+    pl.fatal(error, "Failed to start message dispatcher");
+    process.exit(-1);
+  });
 
   await db.execute(sql`SELECT 1`).catch((err) => {
     pl.fatal(err, "Failed to connect to Postgres");
@@ -70,7 +82,7 @@ const main = async () => {
     });
   };
 
-  Bun.serve({
+  const server = Bun.serve({
     port: 3000,
     fetch: app.fetch,
   });
@@ -78,12 +90,18 @@ const main = async () => {
   // Graceful shutdown
   process.on("SIGINT", async () => {
     pl.info("SIGINT received");
-    await cleanup();
+    await cleanup().then(() => {
+      pl.info("Cleanup completed, exiting");
+      server.stop();
+    });
   });
 
   process.on("SIGTERM", async () => {
     pl.info("SIGTERM received");
-    await cleanup();
+    await cleanup().then(() => {
+      pl.info("Cleanup completed, exiting");
+      server.stop();
+    });
   });
 };
 

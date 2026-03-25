@@ -1,0 +1,89 @@
+import type { TicketsReservedEvent } from "@booking/common";
+import type { JsMsg } from "@nats-io/jetstream/lib/jsmsg";
+import { arrayOverlaps, and, or, eq } from "drizzle-orm";
+import { pl } from "../logger";
+import { db } from "../db";
+import { ordersTable, OrderStatus } from "../db/schema";
+import { bullQueue, PROCESS_ORDER_QUEUE } from "../queues/order-process-queue";
+
+export async function handleTicketsReserved(msg: JsMsg) {
+  pl.debug(
+    { podName: process.env.POD_NAME, message: msg.json() },
+    "TicketsReserved event received",
+  );
+
+  const data = msg.json<TicketsReservedEvent["data"]>();
+  pl.trace({ data }, "TicketsReserved event data");
+
+  const dbData: typeof ordersTable.$inferInsert = {
+    userId: data.userId,
+    amount: data.amount,
+    expiresAt: new Date(data.expiresAt),
+    ticketIds: data.ticketIds,
+  };
+
+  try {
+    await db.transaction(async (tx) => {
+      const overlaps = await tx
+        .select({ id: ordersTable.id })
+        .from(ordersTable)
+        .where(
+          and(
+            arrayOverlaps(ordersTable.ticketIds, data.ticketIds),
+            or(
+              eq(ordersTable.status, OrderStatus.SUCCEEDED),
+              eq(ordersTable.ordersQueueProcessed, false),
+            ),
+          ),
+        )
+        .limit(1);
+
+      if (overlaps.length > 0) {
+        pl.error(
+          { conflictOrderId: overlaps[0].id, ticketIds: data.ticketIds },
+          "Rejecting TicketsReserved: one or more tickets already reserved",
+        );
+        // Business rule violation – acknowledge to stop retries.
+        // TODO: use msg.term()
+        throw new Error("One or more tickets are already reserved");
+      }
+
+      const insertedOrderArray = await tx
+        .insert(ordersTable)
+        .values(dbData)
+        .returning();
+
+      pl.debug(
+        { result: insertedOrderArray },
+        `Inserted ${insertedOrderArray[0].id} orders from TicketsReserved event`,
+      );
+
+      const job = await bullQueue.add(
+        PROCESS_ORDER_QUEUE,
+        {
+          ticketIds: data.ticketIds,
+        },
+        {
+          delay: Math.max(new Date(data.expiresAt).getTime() - Date.now(), 0),
+          jobId: insertedOrderArray[0].id, // Use order ID as job ID for easy correlation
+        },
+      );
+
+      pl.debug({ jobId: job.id }, "Added job to expiration queue");
+    });
+    msg.ack();
+  } catch (error) {
+    pl.error(error, "Failed to process TicketsReserved event");
+    const deliveryCount = msg.info?.deliveryCount ?? 0;
+    const MAX_REDELIVERIES = 5;
+    if (deliveryCount >= MAX_REDELIVERIES) {
+      pl.error(
+        { deliveryCount: deliveryCount },
+        "Max redeliveries reached for TicketsReserved event, acknowledging message to prevent further retries",
+      );
+      msg.ack();
+    } else {
+      msg.nak(5000); // wait 5 seconds before redelivery
+    }
+  }
+}

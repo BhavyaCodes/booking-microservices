@@ -20,6 +20,7 @@
     "@nats-io/jetstream": "^3.3.0",
     "@nats-io/nats-core": "^3.3.0",
     "@nats-io/transport-node": "^3.3.0",
+    "bullmq": "^5.70.1",
     "drizzle-orm": "^0.45.1",
     "hono": "^4.11.7",
     "pg": "^8.18.0",

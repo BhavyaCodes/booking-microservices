@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../nats-wrapper");
-import { TicketsReservedListener } from "../tickets-reserved-listener";
+import { handleTicketsReserved } from "../tickets-reserved-handler";
 import { natsWrapper as realNatsWrapper } from "../../nats-wrapper";
+import { MessageDispatcher, Subjects } from "@booking/common";
 import { db } from "../../db";
 import { ordersTable, OrderStatus } from "../../db/schema";
 import { v7 as uuidv7 } from "uuid";
@@ -13,20 +14,30 @@ const natsWrapper = realNatsWrapper as unknown as MockedNatsWrapper;
 
 const flushAsync = () => new Promise((resolve) => setTimeout(resolve, 100));
 
-describe("tickets-reserved-listener test", () => {
+describe("tickets-reserved-handler test", () => {
   beforeEach(() => {
     natsWrapper.__reset();
   });
 
-  it("should be able to create instances of TicketsReservedListener", () => {
-    const ticketsReservedListener = new TicketsReservedListener(natsWrapper.js);
-    ticketsReservedListener.listen();
+  it("should be able to register handler with MessageDispatcher", () => {
+    const dispatcher = new MessageDispatcher(
+      natsWrapper.js,
+      "booking",
+      "orders-service-durable",
+    );
+    dispatcher.on(Subjects.TicketsReserved, handleTicketsReserved);
+    dispatcher.listen();
     expect(true).toBe(true);
   });
 
   it("persists orders from TicketsReservedEvent and acks", async () => {
-    const listener = new TicketsReservedListener(natsWrapper.js);
-    await listener.listen();
+    const dispatcher = new MessageDispatcher(
+      natsWrapper.js,
+      "booking",
+      "orders-service-durable",
+    );
+    dispatcher.on(Subjects.TicketsReserved, handleTicketsReserved);
+    await dispatcher.listen();
 
     const ack = vi.fn();
 
@@ -38,6 +49,7 @@ describe("tickets-reserved-listener test", () => {
     };
 
     const msg = {
+      subject: Subjects.TicketsReserved,
       json: () => payload,
       ack,
     } as any;
@@ -56,8 +68,13 @@ describe("tickets-reserved-listener test", () => {
   });
 
   it("should not ack if DB insert fails (negative amount)", async () => {
-    const listener = new TicketsReservedListener(natsWrapper.js);
-    await listener.listen();
+    const dispatcher = new MessageDispatcher(
+      natsWrapper.js,
+      "booking",
+      "orders-service-durable",
+    );
+    dispatcher.on(Subjects.TicketsReserved, handleTicketsReserved);
+    await dispatcher.listen();
     const ack = vi.fn();
     const nak = vi.fn();
 
@@ -75,6 +92,7 @@ describe("tickets-reserved-listener test", () => {
     };
 
     const msg = {
+      subject: Subjects.TicketsReserved,
       json: () => payload,
       ack,
       nak,
@@ -92,8 +110,13 @@ describe("tickets-reserved-listener test", () => {
   });
 
   it("should reject reservation if tickets are already reserved in active order", async () => {
-    const listener = new TicketsReservedListener(natsWrapper.js);
-    await listener.listen();
+    const dispatcher = new MessageDispatcher(
+      natsWrapper.js,
+      "booking",
+      "orders-service-durable",
+    );
+    dispatcher.on(Subjects.TicketsReserved, handleTicketsReserved);
+    await dispatcher.listen();
     const ack = vi.fn();
     const nak = vi.fn();
 
@@ -116,6 +139,7 @@ describe("tickets-reserved-listener test", () => {
     };
 
     const msg = {
+      subject: Subjects.TicketsReserved,
       json: () => payload,
       ack,
       nak,
@@ -133,8 +157,13 @@ describe("tickets-reserved-listener test", () => {
   });
 
   it("should allow reservation if conflicting order is canceled", async () => {
-    const listener = new TicketsReservedListener(natsWrapper.js);
-    await listener.listen();
+    const dispatcher = new MessageDispatcher(
+      natsWrapper.js,
+      "booking",
+      "orders-service-durable",
+    );
+    dispatcher.on(Subjects.TicketsReserved, handleTicketsReserved);
+    await dispatcher.listen();
     const ack = vi.fn();
 
     const sharedTicketId = uuidv7();
@@ -156,6 +185,7 @@ describe("tickets-reserved-listener test", () => {
     };
 
     const msg = {
+      subject: Subjects.TicketsReserved,
       json: () => payload,
       ack,
     } as any;
@@ -170,8 +200,13 @@ describe("tickets-reserved-listener test", () => {
   });
 
   it("should allow reservation if conflicting order is expired", async () => {
-    const listener = new TicketsReservedListener(natsWrapper.js);
-    await listener.listen();
+    const dispatcher = new MessageDispatcher(
+      natsWrapper.js,
+      "booking",
+      "orders-service-durable",
+    );
+    dispatcher.on(Subjects.TicketsReserved, handleTicketsReserved);
+    await dispatcher.listen();
     const ack = vi.fn();
 
     const sharedTicketId = uuidv7();
@@ -193,6 +228,7 @@ describe("tickets-reserved-listener test", () => {
     };
 
     const msg = {
+      subject: Subjects.TicketsReserved,
       json: () => payload,
       ack,
     } as any;
@@ -207,8 +243,13 @@ describe("tickets-reserved-listener test", () => {
   });
 
   it("should ack after max redeliveries even on persistent failure", async () => {
-    const listener = new TicketsReservedListener(natsWrapper.js);
-    await listener.listen();
+    const dispatcher = new MessageDispatcher(
+      natsWrapper.js,
+      "booking",
+      "orders-service-durable",
+    );
+    dispatcher.on(Subjects.TicketsReserved, handleTicketsReserved);
+    await dispatcher.listen();
     const ack = vi.fn();
     const nak = vi.fn();
 
@@ -226,6 +267,7 @@ describe("tickets-reserved-listener test", () => {
     };
 
     const msg = {
+      subject: Subjects.TicketsReserved,
       json: () => payload,
       ack,
       nak,
@@ -243,8 +285,13 @@ describe("tickets-reserved-listener test", () => {
   });
 
   it("should handle multiple non-overlapping reservations", async () => {
-    const listener = new TicketsReservedListener(natsWrapper.js);
-    await listener.listen();
+    const dispatcher = new MessageDispatcher(
+      natsWrapper.js,
+      "booking",
+      "orders-service-durable",
+    );
+    dispatcher.on(Subjects.TicketsReserved, handleTicketsReserved);
+    await dispatcher.listen();
     const ack = vi.fn();
 
     const payload1: TicketsReservedEvent["data"] = {
@@ -262,11 +309,13 @@ describe("tickets-reserved-listener test", () => {
     };
 
     const msg1 = {
+      subject: Subjects.TicketsReserved,
       json: () => payload1,
       ack,
     } as any;
 
     const msg2 = {
+      subject: Subjects.TicketsReserved,
       json: () => payload2,
       ack,
     } as any;
@@ -283,8 +332,13 @@ describe("tickets-reserved-listener test", () => {
   });
 
   it("should reject partial overlaps in ticket reservations", async () => {
-    const listener = new TicketsReservedListener(natsWrapper.js);
-    await listener.listen();
+    const dispatcher = new MessageDispatcher(
+      natsWrapper.js,
+      "booking",
+      "orders-service-durable",
+    );
+    dispatcher.on(Subjects.TicketsReserved, handleTicketsReserved);
+    await dispatcher.listen();
     const ack = vi.fn();
     const nak = vi.fn();
 
@@ -306,6 +360,7 @@ describe("tickets-reserved-listener test", () => {
     };
 
     const msg = {
+      subject: Subjects.TicketsReserved,
       json: () => payload,
       ack,
       nak,

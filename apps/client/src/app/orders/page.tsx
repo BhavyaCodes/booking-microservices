@@ -27,11 +27,15 @@ const ordersPage = async ({
   // console.log("🚀 ~ ordersPage ~ _data:", _data);
   const data = await orderResponse.json();
 
-  if(data.order?.paymentIntent?.client_secret){
+
+  
+
+
+  if(data.order?.paymentIntent?.client_secret) {
     return (
       <>
       <h1>payment componenttt</h1>
-      <PaymentComponent clientSecret={data.order?.paymentIntent?.client_secret} />
+      <PaymentComponent  clientSecret={data.order?.paymentIntent?.client_secret} orderId={data.order.id} />
       </>
     );
   }
@@ -92,9 +96,10 @@ const ordersPage = async ({
     return <div>No Orders</div>;
   }
 
-  if (searchParamsResolved.clientSecret) {
+
+  if (searchParamsResolved.clientSecret ) {
     return (
-      <PaymentComponent clientSecret={searchParamsResolved.clientSecret} />
+      <PaymentComponent clientSecret={searchParamsResolved.clientSecret} orderId={data.order.id} />
     );
   }
 
