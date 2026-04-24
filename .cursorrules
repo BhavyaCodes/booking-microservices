@@ -1,0 +1,43 @@
+# Booking monorepo — AI context
+
+## Layout
+- **Workspaces**: `apps/*` (services + client), `packages/common` (shared code).
+- **Services**: `apps/auth`, `apps/tickets`, `apps/orders` — Node/TypeScript APIs, NATS, Vitest.
+- **Client**: `apps/client` — Next.js (App Router), TypeScript.
+- **Infra**: `infra/k8s/`, root `skaffold.yaml` — do not change manifests unless the task is deployment-related.
+- **Package/runtime tooling**: this repo uses npm workspaces with a Bun lockfile; prefer existing `bun` scripts in each workspace.
+
+## Edits
+- Prefer changing the **smallest surface**: the app or package that owns the feature; import from `packages/common` instead of duplicating.
+- Match existing patterns in the touched file (imports, error handling, logging style, test layout).
+- Avoid drive-by refactors, new docs/README, or unrelated formatting.
+
+## TypeScript & runtime
+- `"type": "module"` at root — use ESM-aware imports and Node conventions consistent with nearby files.
+- Validate external input with existing patterns (e.g. Zod where the app already uses it).
+- For Hono route validation, follow `zValidator(..., { hook: zodValidationHook })` patterns from `@booking/common` when already used by the app.
+
+## Data & migrations
+- **Auth** uses Mongo/Mongoose. **Tickets** and **Orders** use Postgres + Drizzle.
+- Schema and migrations for Postgres services live under each app’s `src/db/`; schema changes need matching migrations in that app’s Drizzle setup.
+- Keep migration workflow aligned with `infra/k8s/*-migration-job.yaml` for the service you changed.
+- Do not mix service env prefixes/helpers across apps (e.g. `TICKETS_POSTGRES_*` vs `ORDERS_POSTGRES_*`).
+
+## Events (NATS)
+- **Transactional outbox**: Services that persist domain data and must emit NATS messages should **not** call JetStream `publish` directly from HTTP handlers or after a successful DB commit in a separate step. Instead, **insert the event in the same database transaction** as the business write using the app’s outbox helper (e.g. `addEventToOutBox` in `apps/orders/src/outbox/` and `apps/tickets/src/outbox/`). A background path calls **`outboxPublisher`** to read unprocessed rows and publish to NATS, then mark them processed — this keeps the database and message bus consistent.
+- Event names, subjects, and publishers/listeners live under `packages/common/nats` and per-app `events/` / wrappers — keep contracts consistent across publishers and subscribers.
+- Adding or renaming an event requires coordinated updates to shared subjects/contracts and all affected publishers + subscribers.
+
+## Tests
+- Vitest: colocate `**/__test__/**` or `*.test.ts` as in each app; mirror existing mock patterns (e.g. `__mocks__/nats-wrapper`).
+- Vitest is configured to run sequentially in backend services; avoid introducing test patterns that rely on file-level parallelism.
+- Orders tests depend on `.env.test`; use existing test scripts that load it.
+- Tickets/Orders integration tests may require the local Postgres test compose services.
+
+## Client-specific notes
+- ESLint configuration exists in `apps/client`; avoid assuming equivalent lint setup exists in backend apps.
+- Client typed API usage depends on `apps/auth/src/app.ts` and `apps/orders/src/app.ts` exports used by `hc` clients and TS path aliases.
+
+## Security & communication
+- Never commit or echo secrets from `dev.env` or similar files; use placeholders in examples.
+- Prefer clear, complete sentences; use full paths and code citations when referring to code the user can open.
