@@ -1,4 +1,4 @@
-apiVersion: skaffold/v4beta13
+apiVersion: skaffold/v4beta14
 kind: Config
 build:
   artifacts:
@@ -32,7 +32,7 @@ build:
         dockerfile: infra/docker/dev-client.Dockerfile
       sync:
         manual:
-          - src: "apps/{client,auth,tickets,orders}/src/**/*.{js,ts,tsx}"
+          - src: apps/{client,auth,tickets,orders}/src/**/*.{js,ts,tsx}
             dest: /app
 
   local:
