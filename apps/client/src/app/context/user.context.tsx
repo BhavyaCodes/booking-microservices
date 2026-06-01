@@ -37,22 +37,27 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const fetchUser = async () => {
-      const response = await hcAuthClient.api.auth["current-user"].$get();
-      if (response.ok) {
-        const data = await response.json();
+      try {
+        const response = await hcAuthClient.api.auth["current-user"].$get();
+        if (response.ok) {
+          const data = await response.json();
 
-        setCurrentUser({
-          email: data.currentUser.email,
-          id: data.currentUser.id,
-          picture: data.currentUser.picture,
-          role: data.currentUser.role,
-        });
-      } else {
+          setCurrentUser({
+            email: data.currentUser.email,
+            id: data.currentUser.id,
+            picture: data.currentUser.picture,
+            role: data.currentUser.role,
+          });
+        } else {
+          setCurrentUser(null);
+        }
+      } catch (error) {
+        console.error("Error fetching current user:", error);
         setCurrentUser(null);
       }
     };
     fetchUser();
-  }, [hcAuthClient]);
+  }, []);
 
   return (
     <UserContext.Provider
