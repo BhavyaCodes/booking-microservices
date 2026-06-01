@@ -2,13 +2,13 @@ import { Hono } from "hono";
 import { logger } from "hono/logger";
 import axios, { AxiosError } from "axios";
 import { decode, sign } from "hono/jwt";
-import { User, UserRoles } from "./models/user";
+import { User } from "./models/user";
 import { deleteCookie, setCookie } from "hono/cookie";
 import { extractCurrentUser, requireAuth } from "@booking/common/middlewares";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { compare } from "bcryptjs";
-import { CurrentUser } from "@booking/common/interfaces";
+import { CurrentUser, UserRoles } from "@booking/common/interfaces";
 import {
   CustomErrorResponse,
   ErrorCodes,
@@ -121,7 +121,24 @@ const app = new Hono<{
   .get("/api/auth/current-user", requireAuth, async (c) => {
     const currentUserId = c.get("currentUser").id;
     const user = await User.findById(currentUserId);
-    return c.json({ currentUser: user });
+
+    if (!user) {
+      throw new HTTPException(500, {
+        res: new CustomErrorResponse({
+          message: "User not found",
+          code: ErrorCodes.USER_NOT_FOUND,
+        }),
+      });
+    }
+
+    return c.json({
+      currentUser: {
+        id: user.id,
+        email: user.email,
+        picture: user.picture,
+        role: user.role,
+      },
+    });
   })
   .post("/api/auth/signout", requireAuth, (c) => {
     deleteCookie(c, "session");
