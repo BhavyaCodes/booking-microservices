@@ -28,8 +28,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={inter.variable}>
-      <AppRouterCacheProvider>
-        <body>
+      <body>
+        <AppRouterCacheProvider>
           <ThemeProvider theme={theme}>
             <CssBaseline />
             <UserProvider>
@@ -37,8 +37,8 @@ export default function RootLayout({
               {children}
             </UserProvider>
           </ThemeProvider>
-        </body>
-      </AppRouterCacheProvider>
+        </AppRouterCacheProvider>
+      </body>
     </html>
   );
 }
