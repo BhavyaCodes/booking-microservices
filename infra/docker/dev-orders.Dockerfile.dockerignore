@@ -9,6 +9,7 @@ dev.env
 temp-notes
 utils
 .vscode
+apps/client/.next
 
 apps/client
 apps/auth
