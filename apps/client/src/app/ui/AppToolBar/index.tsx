@@ -1,5 +1,6 @@
 import { AppBar, Toolbar, Typography } from "@mui/material";
 import Link from "next/link";
+import { RightMenu } from "./RightMenu";
 
 export const AppToolbar = () => {
   return (
@@ -17,6 +18,7 @@ export const AppToolbar = () => {
         >
           EventPulse
         </Typography>
+        <RightMenu />
       </Toolbar>
     </AppBar>
   );

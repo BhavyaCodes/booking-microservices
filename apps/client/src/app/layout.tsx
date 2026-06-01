@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 
-import Link from "next/link";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v16-appRouter";
 
 import { CssBaseline } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
 import theme from "../theme";
-import { AppToolbar } from "./AppToolBar";
+import { AppToolbar } from "./ui/AppToolBar";
+import { UserProvider } from "./context/user.context";
 
 const inter = Inter({
   weight: ["400", "500", "600", "700"],
@@ -32,8 +32,10 @@ export default function RootLayout({
         <body>
           <ThemeProvider theme={theme}>
             <CssBaseline />
-            <AppToolbar />
-            {children}
+            <UserProvider>
+              <AppToolbar />
+              {children}
+            </UserProvider>
           </ThemeProvider>
         </body>
       </AppRouterCacheProvider>
