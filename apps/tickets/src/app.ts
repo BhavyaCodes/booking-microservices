@@ -262,6 +262,32 @@ const app = new Hono<{
 
     return c.json(events, 200);
   })
+  .get("/api/tickets/events/:eventId", async (c) => {
+    const { eventId } = c.req.param();
+    const event = await db.query.eventsTable.findFirst({
+      where: (eventsTable, { eq, and }) =>
+        and(eq(eventsTable.id, eventId), eq(eventsTable.draft, false)),
+    });
+
+    if (!event) {
+      throw new HTTPException(404, {
+        res: new CustomErrorResponse({
+          message: "Event not found",
+        }),
+      });
+    }
+
+    return c.json(
+      {
+        id: event.id,
+        title: event.title,
+        desc: event.desc,
+        date: event.date,
+        imageUrl: event.imageUrl,
+      },
+      200,
+    );
+  })
   //TODO: add get event endpoints
   // seat categories routes
   .post(
@@ -272,6 +298,11 @@ const app = new Hono<{
       "json",
       z
         .object({
+          name: z.preprocess(
+            (val: unknown) =>
+              typeof val === "string" ? val.trim().toLowerCase() : val,
+            z.string().min(1).max(100),
+          ),
           startRow: z.number().int().min(1),
           endRow: z.number().int().min(1),
           price: z.number().int().min(1),
@@ -305,7 +336,8 @@ const app = new Hono<{
         });
       }
 
-      const { startRow, endRow, price, seatsPerRow } = c.req.valid("json");
+      const { name, startRow, endRow, price, seatsPerRow } =
+        c.req.valid("json");
 
       const newSeatCategory = await db.transaction(async (tx) => {
         // check for overlapping rows with existing seat categories
@@ -344,6 +376,7 @@ const app = new Hono<{
           const newSeatCategory = await tx
             .insert(seatCategoriesTable)
             .values({
+              name,
               eventId: eventId,
               startRow,
               endRow,

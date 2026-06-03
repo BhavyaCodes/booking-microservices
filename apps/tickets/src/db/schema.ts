@@ -36,6 +36,7 @@ export const seatCategoriesTable = pgTable("seat_categories", {
   price: integer().notNull(),
   seatsPerRow: integer().notNull(),
   version: integer().notNull().default(0),
+  name: varchar({ length: 100 }).notNull(),
 });
 
 export const ticketsTable = pgTable(

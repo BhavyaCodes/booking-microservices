@@ -24,7 +24,8 @@
 ### Tickets src
  - [ ] update logic for user not being able to create two orders
    - [ ] can be done by adding additional params to ticket fields or creating new table
-
+ - [ ] add slug to event
+ - [ ] add seat category name
 ### Orders srv
 #### payments
  - [x] create payment intent
