@@ -28,7 +28,7 @@ export const EventCard = ({
 
   return (
     <Link
-      style={{ textDecoration: "none", color: "inherit" }}
+      style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
       href={`/event/${id}`}
     >
       <Card>
