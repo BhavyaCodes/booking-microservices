@@ -3,6 +3,7 @@ import { hc, OrdersAppType } from "@booking/orders/client";
 import PaymentComponent from "./PaymentComponent";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
+import { getHcOrdersServer } from "@/app/lib/hc-server";
 
 const ordersPage = async ({
   searchParams,
@@ -11,31 +12,30 @@ const ordersPage = async ({
 }) => {
   const searchParamsResolved = await searchParams;
   const cookieStore = await cookies();
-  const cookieHeader = cookieStore.toString();
 
-  const ordersClient = hc<OrdersAppType>(
-    "http://ingress-nginx-controller.ingress-nginx.svc.cluster.local",
-    {
-      headers: {
-        Cookie: cookieHeader,
-        Host: "booking.dev",
-      },
-    },
-  );
+  // const ordersClient = hc<OrdersAppType>(
+  //   "http://ingress-nginx-controller.ingress-nginx.svc.cluster.local",
+  //   {
+  //     headers: {
+  //       Cookie: cookieHeader,
+  //       Host: "booking.dev",
+  //     },
+  //   },
+  // );
+
+  const ordersClient = getHcOrdersServer(cookieStore);
   const orderResponse = await ordersClient.api.orders.pending.$get();
-  // const _data = await orderResponse.text();
-  // console.log("🚀 ~ ordersPage ~ _data:", _data);
+
   const data = await orderResponse.json();
 
-
-  
-
-
-  if(data.order?.paymentIntent?.client_secret) {
+  if (data.order?.paymentIntent?.client_secret) {
     return (
       <>
-      <h1>payment componenttt</h1>
-      <PaymentComponent  clientSecret={data.order?.paymentIntent?.client_secret} orderId={data.order.id} />
+        <h1>payment componenttt</h1>
+        <PaymentComponent
+          clientSecret={data.order?.paymentIntent?.client_secret}
+          orderId={data.order.id}
+        />
       </>
     );
   }
@@ -57,28 +57,33 @@ const ordersPage = async ({
     );
     const paymentIntentResponse = await ordersClient.api.orders[
       "create-payment-intent"
-    ][":orderId"].$post({
-      param: {
-        orderId: formData.get("orderId") as string,
-      },
-      json: {
-        address: {
-          city: "Client City",
-          country: "US",
-          line1: "123 Client St",
-          postal_code: "12345",
-          state: "CA",
+    ][":orderId"]
+      .$post({
+        param: {
+          orderId: formData.get("orderId") as string,
         },
-        name: "Client Name",
-      }
-    }).catch((err) => {
-      console.error("Error creating payment intent:", err);
-      throw err
-    });
+        json: {
+          address: {
+            city: "Client City",
+            country: "US",
+            line1: "123 Client St",
+            postal_code: "12345",
+            state: "CA",
+          },
+          name: "Client Name",
+        },
+      })
+      .catch((err) => {
+        console.error("Error creating payment intent:", err);
+        throw err;
+      });
 
     const responseJson = await paymentIntentResponse.json();
 
-    console.info("Payment Intent Response Status:", paymentIntentResponse.status);
+    console.info(
+      "Payment Intent Response Status:",
+      paymentIntentResponse.status,
+    );
     console.info("Payment Intent Response:", responseJson);
 
     if (paymentIntentResponse.status === 200) {
@@ -96,10 +101,12 @@ const ordersPage = async ({
     return <div>No Orders</div>;
   }
 
-
-  if (searchParamsResolved.clientSecret ) {
+  if (searchParamsResolved.clientSecret) {
     return (
-      <PaymentComponent clientSecret={searchParamsResolved.clientSecret} orderId={data.order.id} />
+      <PaymentComponent
+        clientSecret={searchParamsResolved.clientSecret}
+        orderId={data.order.id}
+      />
     );
   }
 
