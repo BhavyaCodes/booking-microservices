@@ -1,6 +1,7 @@
 import { getHcTicketsServer } from "@/app/lib/hc-server";
 import { Button, Card, CardContent, Grid, Typography } from "@mui/material";
 import { cookies } from "next/headers";
+import Link from "next/link";
 
 export const EventPricing = async ({ eventId }: { eventId: string }) => {
   const cookieStore = await cookies();
@@ -31,9 +32,11 @@ export const EventPricing = async ({ eventId }: { eventId: string }) => {
             <Typography variant="h6" gutterBottom>
               Starting from: ₹{lowestPrice / 100}
             </Typography>
-            <Button variant="contained" color="primary">
-              Book Now
-            </Button>
+            <Link href={`/event/${eventId}/book`}>
+              <Button variant="contained" color="primary">
+                Book Now
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       </Grid>
