@@ -7,6 +7,7 @@ import {
   CardMedia,
   Typography,
 } from "@mui/material";
+import Link from "next/link";
 
 export const EventCard = ({
   date,
@@ -26,12 +27,17 @@ export const EventCard = ({
   const formattedDate = format(date, "dd MMM yyyy");
 
   return (
-    <Card>
-      <CardMedia sx={{ height: 140 }} image={imageUrl ?? ""} title={title} />
-      <CardHeader title={title} subheader={formattedDate} />
-      <CardContent>
-        <Typography variant="body1">{desc}</Typography>
-      </CardContent>
-    </Card>
+    <Link
+      style={{ textDecoration: "none", color: "inherit" }}
+      href={`/event/${id}`}
+    >
+      <Card>
+        <CardMedia sx={{ height: 140 }} image={imageUrl ?? ""} title={title} />
+        <CardHeader title={title} subheader={formattedDate} />
+        <CardContent>
+          <Typography variant="body1">{desc}</Typography>
+        </CardContent>
+      </Card>
+    </Link>
   );
 };
