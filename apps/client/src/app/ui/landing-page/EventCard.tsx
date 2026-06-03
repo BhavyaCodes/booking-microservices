@@ -1,3 +1,5 @@
+import { format } from "date-fns";
+
 import {
   Card,
   CardContent,
@@ -21,10 +23,12 @@ export const EventCard = ({
   imageUrl: string | null;
   title: string;
 }) => {
+  const formattedDate = format(date, "dd MMM yyyy");
+
   return (
     <Card>
       <CardMedia sx={{ height: 140 }} image={imageUrl ?? ""} title={title} />
-      <CardHeader title={title} subheader={date} />
+      <CardHeader title={title} subheader={formattedDate} />
       <CardContent>
         <Typography variant="body1">{desc}</Typography>
       </CardContent>
