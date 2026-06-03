@@ -14,6 +14,12 @@
     "test": "vitest",
     "test:run": "vitest run"
   },
+  "exports": {
+    "./client": {
+      "types": "./src/client.ts",
+      "default": "./src/client.ts"
+    }
+  },
   "dependencies": {
     "@booking/common": "workspace:*",
     "@hono/zod-validator": "^0.7.5",
