@@ -16,7 +16,7 @@ export const AppToolbar = () => {
           sx={{ flexGrow: 1 }}
           color="primary"
         >
-          EventPulse
+          Syncro
         </Typography>
         <RightMenu />
       </Toolbar>
