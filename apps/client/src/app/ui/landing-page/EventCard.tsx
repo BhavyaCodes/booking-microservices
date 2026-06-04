@@ -12,14 +12,12 @@ import Link from "next/link";
 export const EventCard = ({
   date,
   desc,
-  draft,
   id,
   imageUrl,
   title,
 }: {
   date: string;
   desc: string;
-  draft: boolean;
   id: string;
   imageUrl: string | null;
   title: string;
