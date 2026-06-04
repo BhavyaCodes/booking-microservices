@@ -21,6 +21,7 @@ import {
   isNotNull,
   isNull,
   inArray,
+  desc,
 } from "drizzle-orm";
 import {
   CustomErrorResponse,
@@ -255,9 +256,21 @@ const app = new Hono<{
       return c.json(result, 200);
     },
   )
+  // TODO: add pagination to this endpoint,
+  // add sorting by date or title
+  // add filtering by date range
+  // remove unwanted fields from response
   .get("/api/tickets/events", async (c) => {
     const events = await db.query.eventsTable.findMany({
       where: (eventsTable, { eq }) => eq(eventsTable.draft, false),
+      columns: {
+        date: true,
+        title: true,
+        imageUrl: true,
+        id: true,
+        desc: true,
+      },
+      orderBy: [desc(eventsTable.date)],
     });
 
     return c.json(events, 200);
