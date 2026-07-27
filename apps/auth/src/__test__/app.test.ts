@@ -1,8 +1,9 @@
 import { testClient } from "hono/testing";
 import { app as authApp } from "../app";
 import { describe, it, expect } from "vitest";
-import { User, UserRoles } from "../models/user";
+import { User } from "../models/user";
 import { ErrorCodes } from "@booking/common";
+import { UserRoles } from "@booking/common/interfaces";
 
 const client = testClient(authApp);
 
