@@ -9,9 +9,11 @@ export const AppToolbar = () => {
         <Box
           sx={{ flexGrow: 1, display: "flex", alignItems: "center", gap: 2 }}
         >
-          <Typography variant="h6" color="primary">
-            Syncro
-          </Typography>
+          <Link href="/" style={{ textDecoration: "none" }}>
+            <Typography variant="h6" color="primary">
+              Syncro
+            </Typography>
+          </Link>
           <nav>
             <Link href="/orders">orders</Link>
           </nav>
