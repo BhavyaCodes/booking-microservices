@@ -835,6 +835,34 @@ const app = new Hono<{
       return c.json(response, 200);
     },
   )
+  // add endpoint to get all tickets and seat categories for an event
+  .get(
+    "/api/tickets/events/:eventId/tickets",
+    requireAuth,
+    zValidator("param", z.object({ eventId: z.uuid() }), zodValidationHook),
+    async (c) => {
+      const { eventId } = c.req.param();
+
+      const seatCategoriesWithTickets =
+        await db.query.seatCategoriesTable.findMany({
+          where: (seatCategoriesTable, { eq }) =>
+            eq(seatCategoriesTable.eventId, eventId),
+          with: {
+            tickets: {
+              orderBy: (ticketsTable, { asc }) => [
+                asc(ticketsTable.row),
+                asc(ticketsTable.seatNumber),
+              ],
+            },
+          },
+          orderBy: (seatCategoriesTable, { asc }) => [
+            asc(seatCategoriesTable.startRow),
+          ],
+        });
+      return c.json(seatCategoriesWithTickets, 200);
+    },
+  )
+
   .post(
     "/api/tickets/seat-categories/:seatCategoryId/tickets/reserve",
     requireAuth,
