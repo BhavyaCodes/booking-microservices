@@ -88,7 +88,7 @@ const main = async () => {
   }
 
   const cleanup = async () => {
-    notifClient.query("UNLISTEN outbox_insert").catch((err) => {
+    await notifClient.query("UNLISTEN outbox_insert").catch((err) => {
       pl.error(err, "Failed to unlisten outbox_insert");
     });
     notifClient.release();
