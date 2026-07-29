@@ -42,7 +42,7 @@ type SeatMapProps = {
 };
 
 function isAvailable(ticket: Ticket): boolean {
-  return !ticket.sold && ticket.userId == null;
+  return ticket.userId == null;
 }
 
 function groupTicketsByRow(tickets: Ticket[]): Map<number, Ticket[]> {
@@ -61,6 +61,8 @@ function groupTicketsByRow(tickets: Ticket[]): Map<number, Ticket[]> {
 export const SeatMap = ({ categories }: SeatMapProps) => {
   const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  console.log(selectedIds);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
     null,
   );
@@ -170,7 +172,7 @@ export const SeatMap = ({ categories }: SeatMapProps) => {
           overflowX: "auto",
         }}
       >
-        {categoriesWithRows.map(({ category, rows }) => (
+        {[...categoriesWithRows].reverse().map(({ category, rows }) => (
           <Box
             key={category.id}
             sx={{
@@ -217,7 +219,7 @@ export const SeatMap = ({ categories }: SeatMapProps) => {
               }}
             >
               {[...rows.entries()]
-                .sort(([a], [b]) => a - b)
+                .sort(([a], [b]) => b - a)
                 .map(([rowNum, seats]) => (
                   <Box
                     key={rowNum}

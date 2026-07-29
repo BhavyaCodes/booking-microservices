@@ -1,10 +1,7 @@
 import { getHcTicketsServer } from "@/app/lib/hc-server";
 import { Typography } from "@mui/material";
 import { cookies } from "next/headers";
-import {
-  SeatMap,
-  type SeatCategoryWithTickets,
-} from "./SeatMap";
+import { SeatMap, type SeatCategoryWithTickets } from "./SeatMap";
 
 const BookPage = async ({
   params,
