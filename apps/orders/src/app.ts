@@ -866,7 +866,6 @@ const app = new Hono<{
     return c.json({ received: true });
   })
   .get("/api/orders/purchases", requireAuth, async (c) => {
-    pl.debug(c.get("currentUser"), "Fetching purchases");
     const currentUser = c.get("currentUser");
     const purchases = await db
       .select({
