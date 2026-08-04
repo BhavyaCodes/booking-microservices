@@ -51,6 +51,7 @@
 
 #### Client
  - [ ] don't use stripe client secret in url
+ - [ ] handle seat getting booked when page already opened
  
 ### Infra
  - [x] check nats connection before starting? OR add retry mechanism in services
