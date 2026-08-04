@@ -333,7 +333,7 @@ export const SeatMap = ({ categories }: SeatMapProps) => {
             {isReserving ? (
               <CircularProgress size={22} color="inherit" />
             ) : (
-              "Pay"
+              "Proceed to Pay"
             )}
           </Button>
         </Box>
