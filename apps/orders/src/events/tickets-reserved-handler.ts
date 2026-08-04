@@ -1,10 +1,11 @@
 import type { TicketsReservedEvent } from "@booking/common";
-import type { JsMsg } from "@nats-io/jetstream/lib/jsmsg";
+// import type { JsMsg } from "@nats-io/jetstream/lib/jsmsg";
 import { arrayOverlaps, and, or, eq } from "drizzle-orm";
 import { pl } from "../logger";
 import { db } from "../db";
 import { ordersTable, OrderStatus } from "../db/schema";
 import { bullQueue, PROCESS_ORDER_QUEUE } from "../queues/order-process-queue";
+import { JsMsg } from "@nats-io/jetstream";
 
 export async function handleTicketsReserved(msg: JsMsg) {
   pl.debug(
