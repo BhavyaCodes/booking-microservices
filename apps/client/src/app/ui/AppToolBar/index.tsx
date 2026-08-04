@@ -10,12 +10,15 @@ export const AppToolbar = () => {
           sx={{ flexGrow: 1, display: "flex", alignItems: "center", gap: 2 }}
         >
           <Link href="/" style={{ textDecoration: "none" }}>
-            <Typography variant="h6" color="primary">
+            <Typography variant="h6" color="secondary">
               Syncro
             </Typography>
           </Link>
           <nav>
             <Link href="/orders">orders</Link>
+          </nav>
+          <nav>
+            <Link href="/purchases">purchases</Link>
           </nav>
         </Box>
         <RightMenu />
