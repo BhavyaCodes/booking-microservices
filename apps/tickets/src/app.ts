@@ -1008,6 +1008,65 @@ const app = new Hono<{
       ticketsCount: ticketsCount[0].count,
     });
   })
+  .query(
+    "/api/tickets/order-info-by-ticket-ids",
+    requireAuth,
+    zValidator(
+      "json",
+      z.object({ ticketIds: z.array(z.uuid()) }),
+      zodValidationHook,
+    ),
+    async (c) => {
+      const { ticketIds } = c.req.valid("json");
+
+      const tickets = await db.query.ticketsTable.findMany({
+        columns: {
+          row: true,
+          seatNumber: true,
+        },
+        where: (ticketsTable, { inArray, and, eq }) =>
+          and(
+            inArray(ticketsTable.id, ticketIds),
+            eq(ticketsTable.userId, c.get("currentUser").id),
+            eq(ticketsTable.sold, true),
+          ),
+        with: {
+          seatCategory: {
+            columns: {
+              name: true,
+            },
+          },
+          event: {
+            columns: {
+              title: true,
+              date: true,
+              imageUrl: true,
+            },
+          },
+        },
+      });
+
+      if (tickets.length === 0) {
+        throw new HTTPException(404, {
+          res: new CustomErrorResponse({
+            message: "Order info not found",
+          }),
+        });
+      }
+
+      return c.json(
+        {
+          event: tickets[0].event,
+          seatCategory: tickets[0].seatCategory,
+          tickets: tickets.map(({ row, seatNumber }) => ({
+            row,
+            seatNumber,
+          })),
+        },
+        200,
+      );
+    },
+  )
   .onError((error, c) => {
     if (error instanceof HTTPException) {
       return error.getResponse();
