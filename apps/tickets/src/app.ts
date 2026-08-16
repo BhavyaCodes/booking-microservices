@@ -862,7 +862,8 @@ const app = new Hono<{
       return c.json(seatCategoriesWithTickets, 200);
     },
   )
-
+  // TODO: Add validation to check if the tickets are already reserved
+  // or do not exist in the specified seat category
   .post(
     "/api/tickets/seat-categories/:seatCategoryId/tickets/reserve",
     requireAuth,
@@ -1013,11 +1014,14 @@ const app = new Hono<{
     requireAuth,
     zValidator(
       "json",
-      z.object({ ticketIds: z.array(z.uuid()) }),
+      z.object({
+        ticketIds: z.array(z.uuid()),
+        sold: z.boolean().optional(),
+      }),
       zodValidationHook,
     ),
     async (c) => {
-      const { ticketIds } = c.req.valid("json");
+      const { ticketIds, sold } = c.req.valid("json");
 
       const tickets = await db.query.ticketsTable.findMany({
         columns: {
@@ -1028,7 +1032,7 @@ const app = new Hono<{
           and(
             inArray(ticketsTable.id, ticketIds),
             eq(ticketsTable.userId, c.get("currentUser").id),
-            eq(ticketsTable.sold, true),
+            sold ? eq(ticketsTable.sold, sold) : undefined,
           ),
         with: {
           seatCategory: {
