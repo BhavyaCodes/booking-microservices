@@ -1032,7 +1032,7 @@ const app = new Hono<{
           and(
             inArray(ticketsTable.id, ticketIds),
             eq(ticketsTable.userId, c.get("currentUser").id),
-            sold ? eq(ticketsTable.sold, sold) : undefined,
+            sold === undefined ? undefined : eq(ticketsTable.sold, sold),
           ),
         with: {
           seatCategory: {
