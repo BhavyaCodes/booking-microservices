@@ -22,7 +22,7 @@ export default async function PurchasesPage() {
   const ticketInfoResponses = await Promise.all(
     ticketIdsArrays.map((ticketIds) =>
       ticketsServerClient.api.tickets["order-info-by-ticket-ids"].$query({
-        json: { ticketIds },
+        json: { ticketIds, sold: true },
       }),
     ),
   );
