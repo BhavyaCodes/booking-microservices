@@ -17,6 +17,14 @@ export const EventPricing = async ({ eventId }: { eventId: string }) => {
 
   const seatCategories = await seatCategoriesResponse.json();
 
+  if (seatCategories.length === 0) {
+    return (
+      <div>
+        <Typography variant="h6">No seat categories found</Typography>
+      </div>
+    );
+  }
+
   const lowestPrice = seatCategories.reduce(
     (min: number, seatCategory: any) => {
       return Math.min(min, seatCategory.price);
