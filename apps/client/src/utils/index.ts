@@ -1,4 +1,4 @@
 // Row number to letter
 export const rowNumberToUppercaseLetter = (rowNumber: number) => {
-  return String.fromCharCode(65 + rowNumber);
+  return String.fromCharCode(64 + rowNumber);
 };
