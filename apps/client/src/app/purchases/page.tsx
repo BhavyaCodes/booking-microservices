@@ -19,6 +19,7 @@ export default async function PurchasesPage() {
   const amounts = purchases.purchases.map((purchase) => purchase.amount);
 
   // send request for each ticketIds array to get the ticket info
+  // TODO: update endpoint in backend
   const ticketInfoResponses = await Promise.all(
     ticketIdsArrays.map((ticketIds) =>
       ticketsServerClient.api.tickets["order-info-by-ticket-ids"].$query({
