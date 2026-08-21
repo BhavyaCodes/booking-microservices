@@ -275,32 +275,36 @@ const app = new Hono<{
 
     return c.json(events, 200);
   })
-  .get("/api/tickets/events/:eventId", async (c) => {
-    const { eventId } = c.req.param();
-    const event = await db.query.eventsTable.findFirst({
-      where: (eventsTable, { eq, and }) =>
-        and(eq(eventsTable.id, eventId), eq(eventsTable.draft, false)),
-    });
-
-    if (!event) {
-      throw new HTTPException(404, {
-        res: new CustomErrorResponse({
-          message: "Event not found",
-        }),
+  .get(
+    "/api/tickets/events/:eventId",
+    zValidator("param", z.object({ eventId: z.uuid() }), zodValidationHook),
+    async (c) => {
+      const { eventId } = c.req.param();
+      const event = await db.query.eventsTable.findFirst({
+        where: (eventsTable, { eq, and }) =>
+          and(eq(eventsTable.id, eventId), eq(eventsTable.draft, false)),
       });
-    }
 
-    return c.json(
-      {
-        id: event.id,
-        title: event.title,
-        desc: event.desc,
-        date: event.date,
-        imageUrl: event.imageUrl,
-      },
-      200,
-    );
-  })
+      if (!event) {
+        throw new HTTPException(404, {
+          res: new CustomErrorResponse({
+            message: "Event not found",
+          }),
+        });
+      }
+
+      return c.json(
+        {
+          id: event.id,
+          title: event.title,
+          desc: event.desc,
+          date: event.date,
+          imageUrl: event.imageUrl,
+        },
+        200,
+      );
+    },
+  )
   //TODO: add get event endpoints
   // seat categories routes
   .post(
