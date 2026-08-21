@@ -24,11 +24,6 @@ export const eventsTable = pgTable("events", {
   version: integer().notNull().default(0),
 });
 
-export const eventsRelations = relations(eventsTable, ({ many }) => ({
-  seatCategories: many(seatCategoriesTable),
-  tickets: many(ticketsTable),
-}));
-
 export const seatCategoriesTable = pgTable("seat_categories", {
   id: uuid()
     .primaryKey()
@@ -44,16 +39,6 @@ export const seatCategoriesTable = pgTable("seat_categories", {
   name: varchar({ length: 100 }).notNull(),
 });
 
-export const seatCategoriesRelations = relations(
-  seatCategoriesTable,
-  ({ one, many }) => ({
-    tickets: many(ticketsTable),
-    event: one(eventsTable, {
-      fields: [seatCategoriesTable.eventId],
-      references: [eventsTable.id],
-    }),
-  }),
-);
 export const ticketsTable = pgTable(
   "tickets",
   {
@@ -80,6 +65,22 @@ export const ticketsTable = pgTable(
       table.seatNumber,
     ),
   ],
+);
+
+export const eventsRelations = relations(eventsTable, ({ many }) => ({
+  seatCategories: many(seatCategoriesTable),
+  tickets: many(ticketsTable),
+}));
+
+export const seatCategoriesRelations = relations(
+  seatCategoriesTable,
+  ({ one, many }) => ({
+    tickets: many(ticketsTable),
+    event: one(eventsTable, {
+      fields: [seatCategoriesTable.eventId],
+      references: [eventsTable.id],
+    }),
+  }),
 );
 
 export const ticketsRelations = relations(ticketsTable, ({ one }) => ({
