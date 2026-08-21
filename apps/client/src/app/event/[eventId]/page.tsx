@@ -1,5 +1,3 @@
-"use server";
-
 import { cookies } from "next/headers";
 import { getHcTicketsServer } from "@/app/lib/hc-server";
 import { Container, Typography } from "@mui/material";
