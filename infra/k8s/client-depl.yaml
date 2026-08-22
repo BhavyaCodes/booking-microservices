@@ -34,6 +34,10 @@ spec:
                 secretKeyRef:
                   name: booking-secrets
                   key: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+            - name: INTERNAL_BASE_URL
+              value: "http://ingress-nginx-controller.ingress-nginx.svc.cluster.local"
+            - name: INTERNAL_HOST
+              value: "booking.dev"
 ---
 apiVersion: v1
 kind: Service

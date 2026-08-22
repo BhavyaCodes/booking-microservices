@@ -23,7 +23,7 @@ spec:
       containers:
         - name: auth
           image: booking-dev-auth:latest
-          imagePullPolicy: Never
+          imagePullPolicy: IfNotPresent
           env:
             - name: MONGO_URI
               value: "mongodb://auth-mongo-srv:27017/auth"

@@ -36,7 +36,7 @@ const main = async () => {
     await natsWrapper.connect("nats://nats-jetstream-srv:4222");
     pl.info("🚀 ~ connected to NATS JetStream!!");
 
-    natsWrapper.nc.closed().then(async (err) => {
+    natsWrapper.nc.closed().then(async (err: any) => {
       pl.error(err, "NATS connection closed");
     });
   } catch (error) {
@@ -88,11 +88,11 @@ const main = async () => {
   }
 
   const cleanup = async () => {
-    notifClient.query("UNLISTEN outbox_insert").catch((err) => {
+    await notifClient.query("UNLISTEN outbox_insert").catch((err) => {
       pl.error(err, "Failed to unlisten outbox_insert");
     });
     notifClient.release();
-    natsWrapper.nc.drain().catch((err) => {
+    natsWrapper.nc.drain().catch((err: any) => {
       pl.error(err, "Failed to drain NATS connection");
     });
     pool.end().catch((err) => {

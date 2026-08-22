@@ -23,17 +23,40 @@
           "isDirectory": false
         },
         {
-          "path": "apps/orders/src/events/order-expired-publisher.ts",
-          "name": "order-expired-publisher.ts",
-          "isDirectory": false
-        },
-        {
           "path": "apps/orders/src/outbox/index.ts",
           "name": "index.ts",
           "isDirectory": false
         }
       ],
       "order": 0,
+      "createdBy": "bhavya",
+      "collapsed": true,
+      "pinned": false,
+      "isGlobal": false
+    },
+    {
+      "id": "ms4r4rdvj8gdyl1eion",
+      "name": "seat booking",
+      "icon": "folder",
+      "color": "",
+      "files": [
+        {
+          "path": "apps/client/src/app/event/[eventId]/book/page.tsx",
+          "name": "page.tsx",
+          "isDirectory": false
+        },
+        {
+          "path": "apps/tickets/src/app.ts",
+          "name": "app.ts",
+          "isDirectory": false
+        },
+        {
+          "path": "apps/tickets/src/db/schema.ts",
+          "name": "schema.ts",
+          "isDirectory": false
+        }
+      ],
+      "order": 1,
       "createdBy": "bhavya",
       "collapsed": false,
       "pinned": false,

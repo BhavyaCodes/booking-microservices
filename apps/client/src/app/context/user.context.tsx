@@ -14,12 +14,15 @@ import { UserRoles } from "@booking/common/interfaces";
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 type UserContextType = {
-  currentUser: {
-    id: string;
-    email: string;
-    picture?: string;
-    role: UserRoles;
-  } | null;
+  currentUser:
+    | {
+        id: string;
+        email: string;
+        picture?: string;
+        role: UserRoles;
+      }
+    | null
+    | undefined;
   setCurrentUser: Dispatch<SetStateAction<UserContextType["currentUser"]>>;
 };
 
@@ -33,7 +36,7 @@ export const useUser = () => {
 
 export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [currentUser, setCurrentUser] =
-    useState<UserContextType["currentUser"]>(null);
+    useState<UserContextType["currentUser"]>(undefined);
 
   useEffect(() => {
     const fetchUser = async () => {

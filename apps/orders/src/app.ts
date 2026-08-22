@@ -18,7 +18,7 @@ import {
 } from "@booking/common";
 import { pl } from "./logger";
 import Stripe from "stripe";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { countryCodes } from "./utils/country-iso-3166-1-alpha-2";
 import { stripe, upsertStripeCustomer } from "./utils/stripe";
 import { bullQueue } from "./queues/order-process-queue";
@@ -864,6 +864,28 @@ const app = new Hono<{
     }
 
     return c.json({ received: true });
+  })
+  .get("/api/orders/purchases", requireAuth, async (c) => {
+    const currentUser = c.get("currentUser");
+    const purchases = await db
+      .select({
+        id: ordersTable.id,
+        amount: ordersTable.amount,
+        createdAt: ordersTable.createdAt,
+        status: ordersTable.status,
+        paymentIntent: ordersTable.paymentIntent,
+        ticketIds: ordersTable.ticketIds,
+      })
+      .from(ordersTable)
+      .where(
+        and(
+          eq(ordersTable.userId, currentUser.id),
+          eq(ordersTable.status, OrderStatus.SUCCEEDED),
+        ),
+      )
+      .orderBy(desc(ordersTable.createdAt))
+      .limit(100);
+    return c.json({ purchases });
   })
   .onError((error, c) => {
     if (error instanceof HTTPException) {

@@ -9,7 +9,7 @@ import {
   jsonb,
   pgEnum,
 } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import { NATSEvent, Subjects } from "@booking/common";
 
 export const eventsTable = pgTable("events", {
@@ -36,6 +36,7 @@ export const seatCategoriesTable = pgTable("seat_categories", {
   price: integer().notNull(),
   seatsPerRow: integer().notNull(),
   version: integer().notNull().default(0),
+  name: varchar({ length: 100 }).notNull(),
 });
 
 export const ticketsTable = pgTable(
@@ -65,6 +66,33 @@ export const ticketsTable = pgTable(
     ),
   ],
 );
+
+export const eventsRelations = relations(eventsTable, ({ many }) => ({
+  seatCategories: many(seatCategoriesTable),
+  tickets: many(ticketsTable),
+}));
+
+export const seatCategoriesRelations = relations(
+  seatCategoriesTable,
+  ({ one, many }) => ({
+    tickets: many(ticketsTable),
+    event: one(eventsTable, {
+      fields: [seatCategoriesTable.eventId],
+      references: [eventsTable.id],
+    }),
+  }),
+);
+
+export const ticketsRelations = relations(ticketsTable, ({ one }) => ({
+  seatCategory: one(seatCategoriesTable, {
+    fields: [ticketsTable.seatCategoryId],
+    references: [seatCategoriesTable.id],
+  }),
+  event: one(eventsTable, {
+    fields: [ticketsTable.eventId],
+    references: [eventsTable.id],
+  }),
+}));
 
 export const subjectEnum = pgEnum(
   "nats_subjects",

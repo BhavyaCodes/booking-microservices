@@ -21,6 +21,7 @@ import {
   isNotNull,
   isNull,
   inArray,
+  desc,
 } from "drizzle-orm";
 import {
   CustomErrorResponse,
@@ -255,13 +256,55 @@ const app = new Hono<{
       return c.json(result, 200);
     },
   )
+  // TODO: add pagination to this endpoint,
+  // add sorting by date or title
+  // add filtering by date range
+  // remove unwanted fields from response
   .get("/api/tickets/events", async (c) => {
     const events = await db.query.eventsTable.findMany({
       where: (eventsTable, { eq }) => eq(eventsTable.draft, false),
+      columns: {
+        date: true,
+        title: true,
+        imageUrl: true,
+        id: true,
+        desc: true,
+      },
+      orderBy: [desc(eventsTable.date)],
     });
 
     return c.json(events, 200);
   })
+  .get(
+    "/api/tickets/events/:eventId",
+    zValidator("param", z.object({ eventId: z.uuid() }), zodValidationHook),
+    async (c) => {
+      const { eventId } = c.req.param();
+      const event = await db.query.eventsTable.findFirst({
+        where: (eventsTable, { eq, and }) =>
+          and(eq(eventsTable.id, eventId), eq(eventsTable.draft, false)),
+      });
+
+      if (!event) {
+        throw new HTTPException(404, {
+          res: new CustomErrorResponse({
+            message: "Event not found",
+          }),
+        });
+      }
+
+      return c.json(
+        {
+          id: event.id,
+          title: event.title,
+          desc: event.desc,
+          date: event.date,
+          imageUrl: event.imageUrl,
+        },
+        200,
+      );
+    },
+  )
   //TODO: add get event endpoints
   // seat categories routes
   .post(
@@ -272,6 +315,11 @@ const app = new Hono<{
       "json",
       z
         .object({
+          name: z.preprocess(
+            (val: unknown) =>
+              typeof val === "string" ? val.trim().toLowerCase() : val,
+            z.string().min(1).max(100),
+          ),
           startRow: z.number().int().min(1),
           endRow: z.number().int().min(1),
           price: z.number().int().min(1),
@@ -305,7 +353,8 @@ const app = new Hono<{
         });
       }
 
-      const { startRow, endRow, price, seatsPerRow } = c.req.valid("json");
+      const { name, startRow, endRow, price, seatsPerRow } =
+        c.req.valid("json");
 
       const newSeatCategory = await db.transaction(async (tx) => {
         // check for overlapping rows with existing seat categories
@@ -344,6 +393,7 @@ const app = new Hono<{
           const newSeatCategory = await tx
             .insert(seatCategoriesTable)
             .values({
+              name,
               eventId: eventId,
               startRow,
               endRow,
@@ -789,6 +839,56 @@ const app = new Hono<{
       return c.json(response, 200);
     },
   )
+  // add endpoint to get all tickets and seat categories for an event
+  .get(
+    "/api/tickets/events/:eventId/tickets",
+    requireAuth,
+    zValidator("param", z.object({ eventId: z.uuid() }), zodValidationHook),
+    async (c) => {
+      const { eventId } = c.req.param();
+
+      // add check if event.draft is false
+      const event = await db.query.eventsTable.findFirst({
+        where: (eventsTable, { eq }) => eq(eventsTable.id, eventId),
+      });
+
+      if (!event || event?.draft) {
+        throw new HTTPException(404, {
+          res: new CustomErrorResponse({
+            message: "Event not found",
+          }),
+        });
+      }
+
+      if (event.date < new Date()) {
+        throw new HTTPException(400, {
+          res: new CustomErrorResponse({
+            message: "Cannot get tickets for past events",
+          }),
+        });
+      }
+
+      const seatCategoriesWithTickets =
+        await db.query.seatCategoriesTable.findMany({
+          where: (seatCategoriesTable, { eq }) =>
+            eq(seatCategoriesTable.eventId, eventId),
+          with: {
+            tickets: {
+              orderBy: (ticketsTable, { asc }) => [
+                asc(ticketsTable.row),
+                asc(ticketsTable.seatNumber),
+              ],
+            },
+          },
+          orderBy: (seatCategoriesTable, { asc }) => [
+            asc(seatCategoriesTable.startRow),
+          ],
+        });
+      return c.json(seatCategoriesWithTickets, 200);
+    },
+  )
+  // TODO: Add validation to check if the tickets are already reserved
+  // or do not exist in the specified seat category
   .post(
     "/api/tickets/seat-categories/:seatCategoryId/tickets/reserve",
     requireAuth,
@@ -934,6 +1034,68 @@ const app = new Hono<{
       ticketsCount: ticketsCount[0].count,
     });
   })
+  .query(
+    "/api/tickets/order-info-by-ticket-ids",
+    requireAuth,
+    zValidator(
+      "json",
+      z.object({
+        ticketIds: z.array(z.uuid()),
+        sold: z.boolean().optional(),
+      }),
+      zodValidationHook,
+    ),
+    async (c) => {
+      const { ticketIds, sold } = c.req.valid("json");
+
+      const tickets = await db.query.ticketsTable.findMany({
+        columns: {
+          row: true,
+          seatNumber: true,
+        },
+        where: (ticketsTable, { inArray, and, eq }) =>
+          and(
+            inArray(ticketsTable.id, ticketIds),
+            eq(ticketsTable.userId, c.get("currentUser").id),
+            sold === undefined ? undefined : eq(ticketsTable.sold, sold),
+          ),
+        with: {
+          seatCategory: {
+            columns: {
+              name: true,
+            },
+          },
+          event: {
+            columns: {
+              title: true,
+              date: true,
+              imageUrl: true,
+            },
+          },
+        },
+      });
+
+      if (tickets.length === 0) {
+        throw new HTTPException(404, {
+          res: new CustomErrorResponse({
+            message: "Order info not found",
+          }),
+        });
+      }
+
+      return c.json(
+        {
+          event: tickets[0].event,
+          seatCategory: tickets[0].seatCategory,
+          tickets: tickets.map(({ row, seatNumber }) => ({
+            row,
+            seatNumber,
+          })),
+        },
+        200,
+      );
+    },
+  )
   .onError((error, c) => {
     if (error instanceof HTTPException) {
       return error.getResponse();

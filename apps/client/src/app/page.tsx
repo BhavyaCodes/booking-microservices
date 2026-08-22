@@ -1,4 +1,5 @@
 import { Box, Typography } from "@mui/material";
+import Events from "@/app/ui/landing-page/Events";
 
 export default function Home() {
   return (
@@ -12,6 +13,7 @@ export default function Home() {
             EventPulse is a platform for creating and managing events.
           </Typography>
         </Box>
+        <Events />
       </main>
     </div>
   );

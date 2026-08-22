@@ -1,0 +1,1 @@
+ALTER TABLE "seat_categories" ADD COLUMN "name" varchar(100) NOT NULL;

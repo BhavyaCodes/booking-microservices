@@ -57,6 +57,13 @@
       "when": 1773140263502,
       "tag": "0007_lame_medusa",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1780522075825,
+      "tag": "0008_rainy_secret_warriors",
+      "breakpoints": true
     }
   ]
 }
