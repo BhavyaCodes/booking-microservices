@@ -847,6 +847,27 @@ const app = new Hono<{
     async (c) => {
       const { eventId } = c.req.param();
 
+      // add check if event.draft is false
+      const event = await db.query.eventsTable.findFirst({
+        where: (eventsTable, { eq }) => eq(eventsTable.id, eventId),
+      });
+
+      if (!event || event?.draft) {
+        throw new HTTPException(404, {
+          res: new CustomErrorResponse({
+            message: "Event not found",
+          }),
+        });
+      }
+
+      if (event.date < new Date()) {
+        throw new HTTPException(400, {
+          res: new CustomErrorResponse({
+            message: "Cannot get tickets for past events",
+          }),
+        });
+      }
+
       const seatCategoriesWithTickets =
         await db.query.seatCategoriesTable.findMany({
           where: (seatCategoriesTable, { eq }) =>
