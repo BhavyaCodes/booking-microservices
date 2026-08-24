@@ -1,0 +1,53 @@
+# Single-origin reverse proxy for local / Cloud Agent development.
+# Mirrors infra/k8s/ingress-srv.yaml: path-based routing to each service so the
+# Next.js client can reach every backend through one origin (NEXT_PUBLIC_BASE_URL).
+# Rendered by start.sh via envsubst.
+worker_processes 1;
+error_log ${DEVSTACK_DIR}/logs/nginx-error.log warn;
+pid ${DEVSTACK_DIR}/run/nginx.pid;
+
+events { worker_connections 1024; }
+
+http {
+  access_log ${DEVSTACK_DIR}/logs/nginx-access.log;
+  client_body_temp_path ${DEVSTACK_DIR}/run/nginx-body;
+  proxy_temp_path ${DEVSTACK_DIR}/run/nginx-proxy;
+  fastcgi_temp_path ${DEVSTACK_DIR}/run/nginx-fastcgi;
+  uwsgi_temp_path ${DEVSTACK_DIR}/run/nginx-uwsgi;
+  scgi_temp_path ${DEVSTACK_DIR}/run/nginx-scgi;
+  client_max_body_size 10m;
+
+  map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+  }
+
+  server {
+    listen ${PROXY_PORT};
+    server_name localhost;
+
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # Prefix match (no required trailing slash) mirrors the ingress regex
+    # `/api/<svc>/?(.*)`, so both `/api/tickets` and `/api/tickets/...` route here.
+    location /api/auth {
+      proxy_pass http://127.0.0.1:${AUTH_PORT};
+    }
+    location /api/tickets {
+      proxy_pass http://127.0.0.1:${TICKETS_PORT};
+    }
+    location /api/orders {
+      proxy_pass http://127.0.0.1:${ORDERS_PORT};
+    }
+    # Everything else (including Next.js HMR websockets) goes to the client.
+    location / {
+      proxy_pass http://127.0.0.1:${CLIENT_PORT};
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection $connection_upgrade;
+    }
+  }
+}

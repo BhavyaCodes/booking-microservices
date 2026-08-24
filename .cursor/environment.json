@@ -1,0 +1,23 @@
+{
+  "name": "Booking microservices",
+  "install": "bash .cursor/dev/install.sh",
+  "start": "bash .cursor/dev/start.sh",
+  "terminals": [
+    {
+      "name": "auth",
+      "command": "bash .cursor/dev/run-service.sh auth"
+    },
+    {
+      "name": "tickets",
+      "command": "bash .cursor/dev/run-service.sh tickets"
+    },
+    {
+      "name": "orders",
+      "command": "bash .cursor/dev/run-service.sh orders"
+    },
+    {
+      "name": "client",
+      "command": "bash .cursor/dev/run-client.sh"
+    }
+  ]
+}
