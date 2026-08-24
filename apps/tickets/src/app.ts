@@ -10,31 +10,31 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db } from "./db";
 import { eventsTable, seatCategoriesTable, ticketsTable } from "./db/schema";
-import {
-  and,
-  count,
-  eq,
-  ne,
-  or,
-  lt,
-  gt,
-  isNotNull,
-  isNull,
-  inArray,
-  desc,
-} from "drizzle-orm";
+import { count } from "drizzle-orm";
 import {
   CustomErrorResponse,
-  ErrorCodes,
   HTTPException,
-  Subjects,
   zodValidationHook,
 } from "@booking/common";
-import { addEventToOutBox } from "./outbox";
 import { logger } from "hono/logger";
 import { pl } from "./logger";
-
-const EXPIRY_TIME_MINUTES = 15;
+import { reserveTickets } from "./modules/reservation";
+import {
+  createEvent,
+  updateDraftEvent,
+  publishEvent,
+  listPublishedEvents,
+  getPublishedEvent,
+} from "./modules/event-catalog";
+import {
+  createSeatCategory,
+  updateSeatCategory,
+  listSeatCategoriesForEvent,
+  listTicketsForSeatCategory,
+  listPublishedSeatCategories,
+  listPublishedTicketsForSeatCategory,
+  listPublishedEventTickets,
+} from "./modules/seat-layout";
 
 const app = new Hono<{
   Variables: {
@@ -64,17 +64,8 @@ const app = new Hono<{
     ),
     async (c) => {
       const { title, desc, date, imageUrl } = c.req.valid("json");
-      const newEvent = await db
-        .insert(eventsTable)
-        .values({
-          title,
-          desc,
-          date,
-          imageUrl,
-        })
-        .returning();
-
-      return c.json(newEvent[0], 201);
+      const newEvent = await createEvent({ title, desc, date, imageUrl });
+      return c.json(newEvent, 201);
     },
   )
   .patch(
@@ -98,75 +89,18 @@ const app = new Hono<{
       zodValidationHook,
     ),
     async (c) => {
-      try {
-        const result = await db.transaction(async (tx) => {
-          const foundEventArr = await tx
-            .select()
-            .from(eventsTable)
-            .where(eq(eventsTable.id, c.req.param("eventId")))
-            .for("update")
-            .limit(1);
-
-          const foundEvent = foundEventArr[0];
-
-          if (!foundEvent) {
-            throw new HTTPException(404, {
-              res: new CustomErrorResponse({
-                message: "Event not found",
-              }),
-            });
-          }
-
-          if (foundEvent.version !== c.req.valid("json").currentVersion) {
-            throw new HTTPException(409, {
-              res: new CustomErrorResponse({
-                code: ErrorCodes.INVALID_VERSION,
-                message:
-                  "Event has been modified by another process. Please refresh and try again.",
-              }),
-            });
-          }
-
-          if (foundEvent.draft === false) {
-            throw new HTTPException(400, {
-              res: new CustomErrorResponse({
-                message: "Cannot edit a published event",
-              }),
-            });
-          }
-
-          const { title, desc, date, imageUrl, currentVersion } =
-            c.req.valid("json");
-
-          const updatedEvent = await tx
-            .update(eventsTable)
-            .set({
-              title: title ?? foundEvent.title,
-              desc: desc ?? foundEvent.desc,
-              date: date ?? foundEvent.date,
-              imageUrl: imageUrl ?? foundEvent.imageUrl,
-              version: currentVersion + 1,
-            })
-            .where(eq(eventsTable.id, c.req.param("eventId")))
-            .returning();
-
-          return updatedEvent[0];
-        });
-
-        return c.json(result, 200);
-      } catch (error) {
-        pl.error(error, "Error updating event");
-
-        if (error instanceof HTTPException) {
-          throw error;
-        } else {
-          throw new HTTPException(500, {
-            res: new CustomErrorResponse({
-              message: "Failed to update event",
-            }),
-          });
-        }
-      }
+      const { eventId } = c.req.param();
+      const { title, desc, date, imageUrl, currentVersion } =
+        c.req.valid("json");
+      const result = await updateDraftEvent({
+        eventId,
+        title,
+        desc,
+        date,
+        imageUrl,
+        currentVersion,
+      });
+      return c.json(result, 200);
     },
   )
   .post(
@@ -183,76 +117,7 @@ const app = new Hono<{
     async (c) => {
       const eventId = c.req.param("eventId");
       const currentVersion = c.req.valid("json").currentVersion;
-      // it should have at least one seat category to be published
-      const seatCategoryCount = await db
-        .select({ count: count() })
-        .from(seatCategoriesTable)
-        .where(eq(seatCategoriesTable.eventId, eventId));
-
-      if (seatCategoryCount[0].count === 0) {
-        throw new HTTPException(400, {
-          res: new CustomErrorResponse({
-            message: "Cannot publish event without at least one seat category",
-          }),
-        });
-      }
-
-      const result = await db.transaction(async (tx) => {
-        const foundEventArr = await tx
-          .select()
-          .from(eventsTable)
-          .where(eq(eventsTable.id, eventId))
-          .for("update")
-          .limit(1);
-
-        const foundEvent = foundEventArr[0];
-
-        if (!foundEvent) {
-          throw new HTTPException(404, {
-            res: new CustomErrorResponse({
-              message: "Event not found",
-            }),
-          });
-        }
-
-        if (foundEvent.version !== currentVersion) {
-          throw new HTTPException(409, {
-            res: new CustomErrorResponse({
-              code: ErrorCodes.INVALID_VERSION,
-              message:
-                "Event has been modified by another process. Please refresh and try again.",
-            }),
-          });
-        }
-
-        if (foundEvent.draft === false) {
-          throw new HTTPException(400, {
-            res: new CustomErrorResponse({
-              message: "Event is already published",
-            }),
-          });
-        }
-
-        const updatedEvent = await tx
-          .update(eventsTable)
-          .set({
-            draft: false,
-            version: currentVersion + 1,
-          })
-          .where(eq(eventsTable.id, eventId))
-          .returning();
-
-        if (updatedEvent.length === 0) {
-          throw new HTTPException(500, {
-            res: new CustomErrorResponse({
-              message: "Internal error publishing event",
-            }),
-          });
-        }
-
-        return updatedEvent[0];
-      });
-
+      const result = await publishEvent({ eventId, currentVersion });
       return c.json(result, 200);
     },
   )
@@ -261,18 +126,7 @@ const app = new Hono<{
   // add filtering by date range
   // remove unwanted fields from response
   .get("/api/tickets/events", async (c) => {
-    const events = await db.query.eventsTable.findMany({
-      where: (eventsTable, { eq }) => eq(eventsTable.draft, false),
-      columns: {
-        date: true,
-        title: true,
-        imageUrl: true,
-        id: true,
-        desc: true,
-      },
-      orderBy: [desc(eventsTable.date)],
-    });
-
+    const events = await listPublishedEvents();
     return c.json(events, 200);
   })
   .get(
@@ -280,32 +134,10 @@ const app = new Hono<{
     zValidator("param", z.object({ eventId: z.uuid() }), zodValidationHook),
     async (c) => {
       const { eventId } = c.req.param();
-      const event = await db.query.eventsTable.findFirst({
-        where: (eventsTable, { eq, and }) =>
-          and(eq(eventsTable.id, eventId), eq(eventsTable.draft, false)),
-      });
-
-      if (!event) {
-        throw new HTTPException(404, {
-          res: new CustomErrorResponse({
-            message: "Event not found",
-          }),
-        });
-      }
-
-      return c.json(
-        {
-          id: event.id,
-          title: event.title,
-          desc: event.desc,
-          date: event.date,
-          imageUrl: event.imageUrl,
-        },
-        200,
-      );
+      const event = await getPublishedEvent(eventId);
+      return c.json(event, 200);
     },
   )
-  //TODO: add get event endpoints
   // seat categories routes
   .post(
     "/api/tickets/admin/events/:eventId/seat-categories",
@@ -333,107 +165,16 @@ const app = new Hono<{
     ),
     async (c) => {
       const { eventId } = c.req.param();
-      const event = await db.query.eventsTable.findFirst({
-        where: (eventsTable, { eq }) => eq(eventsTable.id, eventId),
-      });
-
-      if (!event) {
-        throw new HTTPException(404, {
-          res: new CustomErrorResponse({
-            message: "Event not found",
-          }),
-        });
-      }
-
-      if (!event.draft) {
-        throw new HTTPException(400, {
-          res: new CustomErrorResponse({
-            message: "Event is not in draft mode",
-          }),
-        });
-      }
-
       const { name, startRow, endRow, price, seatsPerRow } =
         c.req.valid("json");
-
-      const newSeatCategory = await db.transaction(async (tx) => {
-        // check for overlapping rows with existing seat categories
-
-        const existingSeatCategoriesForEvent =
-          await tx.query.seatCategoriesTable.findMany({
-            where: (seatCategoriesTable, { eq }) =>
-              eq(seatCategoriesTable.eventId, eventId),
-          });
-
-        const hasOverlap = existingSeatCategoriesForEvent.some((category) => {
-          if (startRow >= category.startRow && startRow <= category.endRow) {
-            return true;
-          }
-
-          if (endRow >= category.startRow && endRow <= category.endRow) {
-            return true;
-          }
-
-          if (startRow <= category.startRow && endRow >= category.endRow) {
-            return true;
-          }
-          return false;
-        });
-
-        if (hasOverlap) {
-          throw new HTTPException(400, {
-            res: new CustomErrorResponse({
-              message:
-                "Seat category rows overlap with existing seat categories",
-            }),
-          });
-        }
-
-        try {
-          const newSeatCategory = await tx
-            .insert(seatCategoriesTable)
-            .values({
-              name,
-              eventId: eventId,
-              startRow,
-              endRow,
-              price,
-              seatsPerRow,
-            })
-            .returning();
-
-          const newTickets: {
-            seatCategoryId: string;
-            row: number;
-            seatNumber: number;
-            eventId: string;
-          }[] = [];
-
-          for (let row = startRow; row <= endRow; row++) {
-            for (let seat = 1; seat <= seatsPerRow; seat++) {
-              newTickets.push({
-                seatCategoryId: newSeatCategory[0].id,
-                row: row,
-                seatNumber: seat,
-                eventId,
-              });
-            }
-          }
-
-          await tx.insert(ticketsTable).values(newTickets);
-
-          return newSeatCategory[0];
-        } catch (error) {
-          // tx.rollback(); // Explicit rollback is not needed; Drizzle ORM handles it automatically
-          pl.error(error, "Error creating seat category and tickets");
-          throw new HTTPException(500, {
-            res: new CustomErrorResponse({
-              message: "Failed to create seat category and tickets",
-            }),
-          });
-        }
+      const newSeatCategory = await createSeatCategory({
+        eventId,
+        name,
+        startRow,
+        endRow,
+        price,
+        seatsPerRow,
       });
-
       return c.json(newSeatCategory, 201);
     },
   )
@@ -463,219 +204,18 @@ const app = new Hono<{
       zodValidationHook,
     ),
     async (c) => {
-      try {
-        // check if seat category exists and is linked to draft event
-        const result = await db.transaction(async (tx) => {
-          const foundSeatCategoryArr = await tx
-            .select()
-            .from(seatCategoriesTable)
-            .where(eq(seatCategoriesTable.id, c.req.param("id")))
-            .for("update")
-            .limit(1);
-
-          const foundSeatCategory = foundSeatCategoryArr[0];
-
-          if (!foundSeatCategory) {
-            throw new HTTPException(404, {
-              res: new CustomErrorResponse({
-                message: "Seat category not found",
-              }),
-            });
-          }
-
-          if (
-            foundSeatCategory.version !== c.req.valid("json").currentVersion
-          ) {
-            throw new HTTPException(409, {
-              res: new CustomErrorResponse({
-                code: ErrorCodes.INVALID_VERSION,
-                message:
-                  "Seat category has been modified by another process. Please refresh and try again.",
-              }),
-            });
-          }
-
-          // throw error if any tickets have been booked under this seat category
-
-          const checkIfAnyTicketsBookedArr = await tx
-            .select()
-            .from(ticketsTable)
-            .where(
-              and(
-                eq(ticketsTable.seatCategoryId, foundSeatCategory.id),
-                isNotNull(ticketsTable.userId),
-              ),
-            )
-            .limit(1);
-
-          if (checkIfAnyTicketsBookedArr.length > 0) {
-            throw new HTTPException(400, {
-              res: new CustomErrorResponse({
-                message:
-                  "Cannot modify seat category as some tickets have already been booked",
-              }),
-            });
-          }
-
-          const linkedEventArr = await tx
-            .select()
-            .from(eventsTable)
-            .where(eq(eventsTable.id, foundSeatCategory.eventId))
-            .limit(1);
-
-          const linkedEvent = linkedEventArr[0];
-
-          if (!linkedEvent || linkedEvent.draft === false) {
-            throw new HTTPException(400, {
-              res: new CustomErrorResponse({
-                message:
-                  "Cannot edit seat category linked to a published or non-existing event",
-              }),
-            });
-          }
-
-          const { startRow, endRow, price, seatsPerRow, currentVersion } =
-            c.req.valid("json");
-
-          // if startRow or endRow is being updated, ensure no overlap with other seat categories
-
-          if (startRow || endRow) {
-            const newStartRow = startRow ?? foundSeatCategory.startRow;
-            const newEndRow = endRow ?? foundSeatCategory.endRow;
-
-            // Validate endRow >= startRow for partial updates
-            if (newEndRow < newStartRow) {
-              throw new HTTPException(400, {
-                res: new CustomErrorResponse({
-                  message: "endRow must be greater than or equal to startRow",
-                }),
-              });
-            }
-
-            const existingSeatCategoriesForEvent = await tx
-              .select()
-              .from(seatCategoriesTable)
-              .where(
-                and(
-                  eq(seatCategoriesTable.eventId, foundSeatCategory.eventId),
-                  ne(seatCategoriesTable.id, foundSeatCategory.id),
-                ),
-              )
-              .for("update");
-
-            const hasOverlap = existingSeatCategoriesForEvent.some(
-              (category) => {
-                if (
-                  newStartRow >= category.startRow &&
-                  newStartRow <= category.endRow
-                ) {
-                  return true;
-                }
-
-                if (
-                  newEndRow >= category.startRow &&
-                  newEndRow <= category.endRow
-                ) {
-                  return true;
-                }
-
-                if (
-                  newStartRow <= category.startRow &&
-                  newEndRow >= category.endRow
-                ) {
-                  return true;
-                }
-                return false;
-              },
-            );
-
-            if (hasOverlap) {
-              throw new HTTPException(400, {
-                res: new CustomErrorResponse({
-                  message:
-                    "Seat category rows overlap with existing seat categories",
-                }),
-              });
-            }
-          }
-
-          // update the seat category
-
-          const updatedSeatCategory = await tx
-            .update(seatCategoriesTable)
-            .set({
-              startRow: startRow ?? foundSeatCategory.startRow,
-              endRow: endRow ?? foundSeatCategory.endRow,
-              price: price ?? foundSeatCategory.price,
-              seatsPerRow: seatsPerRow ?? foundSeatCategory.seatsPerRow,
-              version: currentVersion + 1,
-            })
-            .where(eq(seatCategoriesTable.id, c.req.param("id")))
-            .returning();
-
-          // update the tickets associated with this seat category if seatsPerRow, startRow or endRow changed
-
-          if (seatsPerRow || startRow || endRow) {
-            const finalStartRow = startRow ?? foundSeatCategory.startRow;
-            const finalEndRow = endRow ?? foundSeatCategory.endRow;
-            const finalSeatsPerRow =
-              seatsPerRow ?? foundSeatCategory.seatsPerRow;
-
-            // delete tickets that are out of the new range
-            await tx
-              .delete(ticketsTable)
-              .where(
-                and(
-                  eq(ticketsTable.seatCategoryId, foundSeatCategory.id),
-                  or(
-                    lt(ticketsTable.row, finalStartRow),
-                    gt(ticketsTable.row, finalEndRow),
-                    gt(ticketsTable.seatNumber, finalSeatsPerRow),
-                  ),
-                ),
-              );
-
-            // add tickets for new seats in the expanded range
-
-            const ticketsToAdd: {
-              seatCategoryId: string;
-              row: number;
-              seatNumber: number;
-              eventId: string;
-            }[] = [];
-
-            // upsert tickets for rows
-            for (let row = finalStartRow; row <= finalEndRow; row++) {
-              for (let seat = 1; seat <= finalSeatsPerRow; seat++) {
-                ticketsToAdd.push({
-                  seatCategoryId: foundSeatCategory.id,
-                  row: row,
-                  seatNumber: seat,
-                  eventId: foundSeatCategory.eventId,
-                });
-              }
-            }
-
-            await tx
-              .insert(ticketsTable)
-              .values(ticketsToAdd)
-              .onConflictDoNothing({
-                target: [
-                  ticketsTable.seatCategoryId,
-                  ticketsTable.row,
-                  ticketsTable.seatNumber,
-                ],
-              });
-          }
-
-          return updatedSeatCategory;
-        });
-
-        return c.json(result[0], 200);
-      } catch (error) {
-        pl.error(error, "Error updating seat category");
-        throw error;
-      }
+      const { id } = c.req.param();
+      const { price, startRow, endRow, seatsPerRow, currentVersion } =
+        c.req.valid("json");
+      const result = await updateSeatCategory({
+        id,
+        price,
+        startRow,
+        endRow,
+        seatsPerRow,
+        currentVersion,
+      });
+      return c.json(result, 200);
     },
   )
   .get(
@@ -684,27 +224,7 @@ const app = new Hono<{
     zValidator("param", z.object({ eventId: z.uuid() }), zodValidationHook),
     async (c) => {
       const { eventId } = c.req.param();
-
-      const event = await db.query.eventsTable.findFirst({
-        where: (eventsTable, { eq }) => eq(eventsTable.id, eventId),
-        columns: {
-          id: true,
-        },
-      });
-
-      if (!event) {
-        throw new HTTPException(404, {
-          res: new CustomErrorResponse({
-            message: "Event not found",
-          }),
-        });
-      }
-
-      const seatCategories = await db
-        .select()
-        .from(seatCategoriesTable)
-        .where(eq(seatCategoriesTable.eventId, eventId));
-
+      const seatCategories = await listSeatCategoriesForEvent(eventId);
       return c.json(seatCategories, 200);
     },
   )
@@ -714,49 +234,7 @@ const app = new Hono<{
     zValidator("param", z.object({ eventId: z.uuid() }), zodValidationHook),
     async (c) => {
       const { eventId } = c.req.param();
-      const eventsSubquery = db
-        .select()
-        .from(eventsTable)
-        .where(eq(eventsTable.draft, false))
-        .as("event");
-
-      const result = await db
-        .select()
-        .from(seatCategoriesTable)
-        .where(eq(seatCategoriesTable.eventId, eventId))
-        .innerJoinLateral(
-          eventsSubquery,
-          eq(seatCategoriesTable.eventId, eventsSubquery.id),
-        );
-
-      pl.debug({ result }, "Seat categories with event join result");
-
-      // Check if event exists and is published by verifying if we got any results
-      // with valid event data, or if no results, event doesn't exist or is in draft
-      if (result.length === 0) {
-        // Check if event exists at all
-        const event = await db.query.eventsTable.findFirst({
-          where: eq(eventsTable.id, eventId),
-        });
-
-        if (!event) {
-          throw new HTTPException(404, {
-            res: new CustomErrorResponse({
-              message: "Event not found",
-            }),
-          });
-        }
-
-        // Event exists but is in draft mode
-        throw new HTTPException(404, {
-          res: new CustomErrorResponse({
-            message: "Seat category not found",
-          }),
-        });
-      }
-
-      const seatCategories = result.map((r) => r.seat_categories);
-
+      const seatCategories = await listPublishedSeatCategories(eventId);
       return c.json(seatCategories, 200);
     },
   )
@@ -771,12 +249,7 @@ const app = new Hono<{
     ),
     async (c) => {
       const { seatCategoryId } = c.req.param();
-
-      const tickets = await db.query.ticketsTable.findMany({
-        where: (ticketsTable, { eq }) =>
-          eq(ticketsTable.seatCategoryId, seatCategoryId),
-      });
-
+      const tickets = await listTicketsForSeatCategory(seatCategoryId);
       return c.json(tickets, 200);
     },
   )
@@ -790,105 +263,22 @@ const app = new Hono<{
     ),
     async (c) => {
       const { seatCategoryId } = c.req.param();
-
-      // normal user - only return tickets for published events
-
-      // FIXME: might be better to fetch event first to check if published, then fetch tickets
-
-      const tickets = await db
-        .select()
-        .from(ticketsTable)
-        .where(eq(ticketsTable.seatCategoryId, seatCategoryId))
-        .innerJoin(
-          seatCategoriesTable,
-          eq(ticketsTable.seatCategoryId, seatCategoriesTable.id),
-        )
-        .innerJoin(
-          eventsTable,
-          eq(seatCategoriesTable.eventId, eventsTable.id),
-        );
-
-      if (tickets.length === 0) {
-        throw new HTTPException(404, {
-          res: new CustomErrorResponse({
-            message: "No tickets found for the given seat category",
-          }),
-        });
-      }
-
-      if (tickets[0].events.draft) {
-        throw new HTTPException(404, {
-          res: new CustomErrorResponse({
-            message: "Event not found",
-          }),
-        });
-      }
-
-      const response = tickets.map((t) => {
-        return {
-          id: t.tickets.id,
-          seatCategoryId: t.tickets.seatCategoryId,
-          row: t.tickets.row,
-          seatNumber: t.tickets.seatNumber,
-          userId: Boolean(t.tickets.userId),
-          eventId: t.tickets.eventId,
-          sold: t.tickets.sold,
-        };
-      });
-
+      const response =
+        await listPublishedTicketsForSeatCategory(seatCategoryId);
       return c.json(response, 200);
     },
   )
-  // add endpoint to get all tickets and seat categories for an event
   .get(
     "/api/tickets/events/:eventId/tickets",
     requireAuth,
     zValidator("param", z.object({ eventId: z.uuid() }), zodValidationHook),
     async (c) => {
       const { eventId } = c.req.param();
-
-      // add check if event.draft is false
-      const event = await db.query.eventsTable.findFirst({
-        where: (eventsTable, { eq }) => eq(eventsTable.id, eventId),
-      });
-
-      if (!event || event?.draft) {
-        throw new HTTPException(404, {
-          res: new CustomErrorResponse({
-            message: "Event not found",
-          }),
-        });
-      }
-
-      if (event.date < new Date()) {
-        throw new HTTPException(400, {
-          res: new CustomErrorResponse({
-            message: "Cannot get tickets for past events",
-          }),
-        });
-      }
-
       const seatCategoriesWithTickets =
-        await db.query.seatCategoriesTable.findMany({
-          where: (seatCategoriesTable, { eq }) =>
-            eq(seatCategoriesTable.eventId, eventId),
-          with: {
-            tickets: {
-              orderBy: (ticketsTable, { asc }) => [
-                asc(ticketsTable.row),
-                asc(ticketsTable.seatNumber),
-              ],
-            },
-          },
-          orderBy: (seatCategoriesTable, { asc }) => [
-            asc(seatCategoriesTable.startRow),
-          ],
-        });
+        await listPublishedEventTickets(eventId);
       return c.json(seatCategoriesWithTickets, 200);
     },
   )
-  // TODO: Add validation to check if the tickets are already reserved
-  // or do not exist in the specified seat category
   .post(
     "/api/tickets/seat-categories/:seatCategoryId/tickets/reserve",
     requireAuth,
@@ -909,115 +299,13 @@ const app = new Hono<{
       const { ticketIds } = c.req.valid("json");
       const userId = c.get("currentUser").id;
 
-      try {
-        const reservedTickets = await db.transaction(async (tx) => {
-          // lock the tickets to be reserved
-          const lockedTickets = await tx
-            .select()
-            .from(ticketsTable)
-            .where(
-              and(
-                eq(ticketsTable.seatCategoryId, seatCategoryId),
-                inArray(ticketsTable.id, ticketIds),
-                isNull(ticketsTable.userId),
-              ),
-            )
-            .for("update");
+      const reservedTickets = await reserveTickets({
+        seatCategoryId,
+        ticketIds,
+        userId,
+      });
 
-          if (lockedTickets.length !== ticketIds.length) {
-            throw new HTTPException(400, {
-              res: new CustomErrorResponse({
-                message:
-                  "Some tickets are already reserved or do not exist in the specified seat category",
-              }),
-            });
-          }
-
-          const seatCategoryWithEvent = await tx
-            .select()
-            .from(seatCategoriesTable)
-            .where(eq(seatCategoriesTable.id, seatCategoryId))
-            .innerJoin(
-              eventsTable,
-              eq(seatCategoriesTable.eventId, eventsTable.id),
-            )
-            .limit(1)
-            .for("update");
-
-          if (seatCategoryWithEvent.length === 0) {
-            throw new HTTPException(404, {
-              res: new CustomErrorResponse({
-                message: "Seat category not found",
-              }),
-            });
-          }
-
-          const linkedEvent = seatCategoryWithEvent[0].events;
-
-          if (linkedEvent.draft) {
-            throw new HTTPException(400, {
-              res: new CustomErrorResponse({
-                message: "Event is not published",
-              }),
-            });
-          }
-
-          if (linkedEvent.date < new Date()) {
-            throw new HTTPException(400, {
-              res: new CustomErrorResponse({
-                message: "Cannot reserve tickets for past events",
-              }),
-            });
-          }
-
-          const ticketsToReserve = await tx
-            .update(ticketsTable)
-            .set({
-              userId,
-            })
-            .where(
-              and(
-                eq(ticketsTable.seatCategoryId, seatCategoryId),
-                inArray(ticketsTable.id, ticketIds),
-                isNull(ticketsTable.userId),
-              ),
-            )
-            .returning();
-
-          if (ticketsToReserve.length !== lockedTickets.length) {
-            // If update touched fewer rows than we locked, treat as failure
-            pl.error(c, "Failed to reserve tickets");
-            throw new HTTPException(500, {
-              res: new CustomErrorResponse({
-                message: "Failed to reserve tickets",
-              }),
-            });
-          }
-
-          await addEventToOutBox(tx, {
-            subject: Subjects.TicketsReserved,
-            data: {
-              ticketIds,
-              userId,
-              amount:
-                ticketsToReserve.length *
-                seatCategoryWithEvent[0].seat_categories.price,
-              expiresAt: new Date(
-                Date.now() + EXPIRY_TIME_MINUTES * 60 * 1000,
-              ).toISOString(),
-            },
-          });
-
-          return ticketsToReserve;
-        });
-
-        return c.json(reservedTickets, 200);
-      } catch (error) {
-        if (!(error instanceof HTTPException)) {
-          pl.error({ error }, "Error reserving tickets");
-        }
-        throw error;
-      }
+      return c.json(reservedTickets, 200);
     },
   )
   // admin route to get counts of events, seat categories and tickets
